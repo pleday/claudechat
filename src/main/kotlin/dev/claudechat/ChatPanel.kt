@@ -38,6 +38,7 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.ui.CollectionListModel
 import com.intellij.ui.JBColor
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.ActionLink
@@ -141,25 +142,57 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }.apply {
         lineWrap = true
         wrapStyleWord = true
-        emptyText.setText("Message…  Entrée = envoyer · Maj+Entrée = ligne · Échap = interrompre · @ = fichier · / = commande")
+        emptyText.setText("@ pour les fichiers, / pour les commandes, Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne")
         inputMap.put(KeyStroke.getKeyStroke("ENTER"), "claude-send")
         actionMap.put("claude-send", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent?) = send()
         })
         inputMap.put(KeyStroke.getKeyStroke("shift ENTER"), "insert-break")
+        inputMap.put(KeyStroke.getKeyStroke("control ENTER"), "claude-refine")
+        actionMap.put("claude-refine", object : AbstractAction() {
+            override fun actionPerformed(e: ActionEvent?) = send(otherBusyMode())
+        })
         inputMap.put(KeyStroke.getKeyStroke("ESCAPE"), "claude-stop")
         actionMap.put("claude-stop", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent?) { if (streaming) stop() }
         })
         document.addDocumentListener(object : javax.swing.event.DocumentListener {
-            override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = mentionChanged()
-            override fun removeUpdate(e: javax.swing.event.DocumentEvent?) {}
+            override fun insertUpdate(e: javax.swing.event.DocumentEvent?) { mentionChanged(); syncSend() }
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent?) { syncSend() }
             override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {}
         })
     }
-    private val sendButton = JButton("Envoyer").apply { addActionListener { send() } }
+    private enum class SendMode { QUEUE, REFINE }
+
+    /** Comportement du bouton / d'Entrée pendant une réponse (mémorisé). */
+    private var busyMode = if (settings.state.busyMode == "queue") SendMode.QUEUE else SendMode.REFINE
+    private fun otherBusyMode() = if (busyMode == SendMode.QUEUE) SendMode.REFINE else SendMode.QUEUE
+    private val sendControl = SendControl()
+
+    private fun setBusyMode(m: SendMode) {
+        busyMode = m
+        settings.state.busyMode = if (m == SendMode.QUEUE) "queue" else "refine"
+        syncSend()
+    }
+
+    /** Rond orange avec flèche (envoyer) ou carré (interrompre) ; le menu mémorise « file d'attente » ou « préciser ». */
+    private fun syncSend() {
+        val blank = input.text.isBlank()
+        val menu = listOf(
+            SplitItem("Mettre en file d'attente", AllIcons.Actions.MoveDown, "Envoyé quand la réponse en cours est terminée", busyMode == SendMode.QUEUE) { setBusyMode(SendMode.QUEUE) },
+            SplitItem("Préciser l'exécution en cours", AllIcons.Actions.Lightning, "Injecté dans la réponse en cours, sans l'interrompre", busyMode == SendMode.REFINE) { setBusyMode(SendMode.REFINE) },
+        )
+        if (streaming && blank) sendControl.configure(RoundSendButton.Mode.STOP, true, "Interrompre la réponse (Échap)", menu) { stop() }
+        else {
+            val tip = if (streaming) {
+                if (busyMode == SendMode.QUEUE) "Mettre en file d'attente (Ctrl+Entrée : préciser)" else "Préciser l'exécution en cours (Ctrl+Entrée : mettre en file d'attente)"
+            } else "Envoyer (Entrée)"
+            sendControl.configure(RoundSendButton.Mode.SEND, !blank, tip, menu) { send() }
+        }
+    }
+
     private val titleLabel = JBLabel().apply { border = JBUI.Borders.emptyLeft(6) }
-    private val attachBox = JBCheckBox("Contexte : fichier / sélection de l'éditeur", true)
+    private var contextOn = true
     private val extraFiles = mutableListOf<Pair<String, String>>()
     private val extraImages = mutableListOf<Triple<String, String, String>>()
     private val extrasLabel = JBLabel().apply { foreground = UIUtil.getContextHelpForeground() }
@@ -169,28 +202,102 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         add(extrasLabel, BorderLayout.CENTER)
         add(ActionLink("effacer").apply { addActionListener { extraFiles.clear(); extraImages.clear(); updateExtras() } }, BorderLayout.EAST)
     }
-    private val queueLabel = JBLabel().apply { foreground = UIUtil.getContextHelpForeground() }
+    private val queueLabel = JBLabel().apply {
+        foreground = UIUtil.getContextHelpForeground()
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) { showQueueDetails() }
+        })
+    }
     private val queueRow = JPanel(BorderLayout()).apply {
         isVisible = false
         border = JBUI.Borders.empty(0, 6)
         add(queueLabel, BorderLayout.CENTER)
         add(ActionLink("vider").apply { addActionListener { queue.clear(); updateQueue() } }, BorderLayout.EAST)
     }
-    private val addFilesLink = ActionLink("+ Joindre fichiers / images…").apply { addActionListener { addFiles() } }
-    private val modelBox = ComboBox(settings.models().toTypedArray()).apply {
-        isEditable = true
-        item = ModelCatalog.resolve(settings.state.model)
-        renderer = com.intellij.ui.SimpleListCellRenderer.create<String>("") { ModelCatalog.display(it) }
-        toolTipText = "Modèle de la conversation, avec son numéro de version (modifiable : saisis un identifiant)"
+    // Modèle, effort et permissions : état + boutons plats (menus au-dessus de la carte de saisie)
+    private var selectedModel = ModelCatalog.resolve(settings.state.model)
+    private var selectedEffort = settings.state.effort
+    private var selectedMode = settings.state.permissionMode
+    private val contextWindows = HashMap<String, Int>()
+    private val ring = ContextRing()
+
+    private fun modeLabel() = PERMISSION_MODES.firstOrNull { it.first == selectedMode }?.second ?: selectedMode
+
+    private val plusButton = FlatButton("", AllIcons.General.Add) { showPlusMenu(it) }.apply {
+        toolTipText = "Joindre des fichiers ou des images, mentionner un fichier (@) ou une commande (/)"
     }
-    private val effortBox = ComboBox(EFFORTS.toTypedArray()).apply {
-        item = settings.state.effort
-        toolTipText = "Niveau d'effort"
+    private val modeButton = FlatButton(modeLabel(), AllIcons.Nodes.Locked) { showModeMenu(it) }.apply {
+        toolTipText = "Permissions : ce que Claude peut faire sans te demander (effectif au message suivant)"
     }
-    private val modeBox = ComboBox(PERMISSION_MODES.map { it.second }.toTypedArray()).apply {
-        selectedIndex = PERMISSION_MODES.indexOfFirst { it.first == settings.state.permissionMode }.coerceAtLeast(0)
-        toolTipText = "Mode de permission (effectif au message suivant)"
+    private val contextChip = FlatButton("", AllIcons.FileTypes.Any_type) { toggleContext() }
+    private val modelButton = FlatButton("", null) { showModelMenu(it) }.apply {
+        toolTipText = "Modèle et niveau d'effort"
     }
+
+    private fun refreshModelButton() {
+        modelButton.text = ModelCatalog.label(selectedModel) + if (selectedEffort != "auto") " · $selectedEffort" else ""
+        modelButton.toolTipText = "Modèle : $selectedModel · effort : $selectedEffort (cliquer pour changer)"
+    }
+
+    private fun refreshContextChip() {
+        val vf = FileEditorManager.getInstance(project).selectedEditor?.file
+        contextChip.text = (vf?.name ?: "Aucun fichier").let { if (it.length > 24) it.take(23) + "…" else it }
+        contextChip.icon = vf?.fileType?.icon ?: AllIcons.FileTypes.Any_type
+        contextChip.dimmed = !contextOn || vf == null
+        contextChip.toolTipText = when {
+            vf == null -> "Aucun fichier ouvert dans l'éditeur"
+            contextOn -> "Contexte : ${vf.path.removePrefix("$cwd/")} sera joint (ou la sélection). Cliquer pour désactiver."
+            else -> "Contexte désactivé. Cliquer pour joindre ${vf.name} automatiquement."
+        }
+    }
+
+    private fun toggleContext() { contextOn = !contextOn; refreshContextChip() }
+
+    private fun saveChoices() {
+        settings.state.model = selectedModel; settings.state.effort = selectedEffort; settings.state.permissionMode = selectedMode
+    }
+
+    private fun popupOf(group: DefaultActionGroup, anchor: java.awt.Component, right: Boolean = false) {
+        val popup = JBPopupFactory.getInstance().createActionGroupPopup(
+            null, group, DataManager.getInstance().getDataContext(anchor), JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, true,
+        )
+        showAbove(popup, anchor, right)
+    }
+
+    private fun choice(text: String, desc: String?, selected: () -> Boolean, set: () -> Unit) = object : ToggleAction(text, desc, null) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+        override fun isSelected(e: AnActionEvent) = selected()
+        override fun setSelected(e: AnActionEvent, state: Boolean) { if (state) set() }
+    }
+
+    private fun showModeMenu(anchor: java.awt.Component) {
+        val g = DefaultActionGroup()
+        PERMISSION_MODES.forEach { (id, label) ->
+            g.add(choice(label, PERMISSION_HELP[label], { selectedMode == id }) { selectedMode = id; modeButton.text = modeLabel(); saveChoices() })
+        }
+        popupOf(g, anchor)
+    }
+
+    private fun showModelMenu(anchor: java.awt.Component) {
+        val g = DefaultActionGroup()
+        g.addSeparator("Modèle")
+        (settings.models() + selectedModel).distinct().forEach { id ->
+            g.add(choice(ModelCatalog.label(id), id, { selectedModel == id }) { selectedModel = id; refreshModelButton(); saveChoices() })
+        }
+        g.addSeparator("Effort")
+        EFFORTS.forEach { e -> g.add(choice(e, null, { selectedEffort == e }) { selectedEffort = e; refreshModelButton(); saveChoices() }) }
+        popupOf(g, anchor, right = true)
+    }
+
+    private fun showPlusMenu(anchor: java.awt.Component) {
+        val g = DefaultActionGroup()
+        g.add(action("Joindre des fichiers ou des images…", AllIcons.General.Add) { addFiles() })
+        g.add(action("Mentionner un fichier (@)", AllIcons.FileTypes.Any_type) { input.requestFocusInWindow(); input.insert("@", input.caretPosition) })
+        g.add(action("Commandes (/)", AllIcons.Actions.Execute) { input.requestFocusInWindow(); input.insert("/", input.caretPosition) })
+        popupOf(g, anchor)
+    }
+
     private val usageLabel = JBLabel().apply {
         foreground = UIUtil.getContextHelpForeground()
         border = JBUI.Borders.emptyRight(6)
@@ -280,24 +387,17 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             add(toolbar.component, BorderLayout.WEST)
             add(titleLabel, BorderLayout.CENTER)
         }
-        val bottom = JPanel(BorderLayout()).apply {
-            add(JBScrollPane(input), BorderLayout.CENTER)
-            add(JPanel().apply {
-                layout = BoxLayout(this, BoxLayout.Y_AXIS)
-                border = JBUI.Borders.empty(2, 4)
-                add(extrasRow)
-                add(queueRow)
-                add(JPanel(BorderLayout()).apply {
-                    add(attachBox, BorderLayout.WEST)
-                    add(addFilesLink, BorderLayout.EAST)
-                })
-                add(JPanel(FlowLayout(FlowLayout.LEFT, 4, 2)).apply {
-                    fun lbl(t: String) = JBLabel(t).apply { foreground = UIUtil.getContextHelpForeground() }
-                    add(lbl("Modèle")); add(modelBox); add(lbl("Effort")); add(effortBox); add(lbl("Permissions")); add(modeBox); add(sendButton)
-                })
-            }, BorderLayout.SOUTH)
+        val inputScroll = JBScrollPane(input).apply { border = JBUI.Borders.empty(); viewportBorder = JBUI.Borders.empty() }
+        val topRows = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            isOpaque = false
+            add(extrasRow); add(queueRow)
         }
-        val splitter = JBSplitter(true, 0.72f).apply {
+        val bottom = JPanel(BorderLayout()).apply {
+            border = JBUI.Borders.empty(2, 6, 6, 6)
+            add(composerCard(inputScroll, topRows, input, listOf(plusButton, modeButton, contextChip), listOf(modelButton, ring, sendControl)), BorderLayout.CENTER)
+        }
+        val splitter = JBSplitter(true, 0.78f).apply {
             firstComponent = JPanel(BorderLayout()).apply {
                 add(scroll, BorderLayout.CENTER)
                 add(JPanel(BorderLayout()).apply { add(JPanel(BorderLayout()).apply {
@@ -311,6 +411,13 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         add(north, BorderLayout.NORTH)
         add(splitter, BorderLayout.CENTER)
+        syncSend(); refreshModelButton(); refreshContextChip()
+        project.messageBus.connect(parent).subscribe(
+            com.intellij.openapi.fileEditor.FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : com.intellij.openapi.fileEditor.FileEditorManagerListener {
+                override fun selectionChanged(event: com.intellij.openapi.fileEditor.FileEditorManagerEvent) { SwingUtilities.invokeLater { refreshContextChip() } }
+            },
+        )
         render(forceBottom = true)
         updateUsage()
         updateQuota(); updateStatus()
@@ -389,12 +496,34 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         return if (rest.isEmpty()) base else "$base\n\n$rest"
     }
 
-    private fun send() {
+    private fun send(mode: SendMode = busyMode) {
         val original = input.text.trim()
         if (original.isEmpty()) return
         input.text = ""
-        if (streaming) { queue.add(original); updateQueue(); return }
+        if (streaming) {
+            if (mode == SendMode.REFINE) refine(original) else { queue.add(original); updateQueue() }
+            return
+        }
         dispatch(original)
+    }
+
+    private val refinedOriginals = HashMap<String, String>()
+
+    /** Précise la consigne en cours : injecté au prochain point d'arrêt de Claude, sans interruption. */
+    private fun refine(original: String) {
+        val t = turn
+        if (t == null || !streaming) { if (streaming) { queue.add(original); updateQueue() } else dispatch(original); return }
+        val text = expandSlash(original)
+        val body = (mentionAttachments(original).map { it.second } + text).joinToString("\n\n")
+        val entry = Entry(Kind.USER, text, note = "⚡ précision envoyée pendant la réponse")
+        session.entries.add(entry)
+        refinedOriginals[body.trim()] = original
+        if (!t.refine(body)) {                       // le tour vient de se terminer : on retombe sur la file
+            session.entries.remove(entry); refinedOriginals.remove(body.trim())
+            if (streaming) { queue.add(original); updateQueue() } else dispatch(original)
+            return
+        }
+        render(forceBottom = true)
     }
 
     private fun dispatch(original: String) {
@@ -402,7 +531,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val noAttach = skipAttachOnce
         skipAttachOnce = false
         val blocks = mutableListOf<Pair<String, String>>()
-        if (attachBox.isSelected && !noAttach) currentFileAttachment()?.let { blocks.add(it) }
+        if (contextOn && !noAttach) currentFileAttachment()?.let { blocks.add(it) }
         blocks.addAll(extraFiles)
         blocks.addAll(mentionAttachments(original))
         val files = blocks.distinctBy { it.first }
@@ -428,7 +557,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         startTurn(content)
     }
 
-    private fun currentMode() = PERMISSION_MODES[modeBox.selectedIndex.coerceAtLeast(0)].first
+    private fun currentMode() = selectedMode
 
     private fun startTurn(content: JsonArray) {
         streaming = true
@@ -437,16 +566,16 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val gen = ++generation
         turnStart = System.currentTimeMillis(); liveOut = 0; lastLimits = null
         tick()
-        val model = ModelCatalog.resolve(modelBox.editor.item?.toString().orEmpty()).ifBlank { settings.state.model }
+        val model = selectedModel.ifBlank { settings.state.model }
         settings.state.model = model
-        settings.state.effort = effortBox.item as String
+        settings.state.effort = selectedEffort
         settings.state.permissionMode = currentMode()
         render(forceBottom = true)
 
         val fork = forkNext
         forkNext = false
         val opts = TurnOptions(
-            settings.cliPath(), cwd, model, effortBox.item as String, currentMode(),
+            settings.cliPath(), cwd, model, selectedEffort, currentMode(),
             session.id, settings.state.system, emptyList(), fork,
         )
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -464,6 +593,16 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onInit(sessionId: String, model: String?) = ui(gen) { session.id = sessionId; activeModel = model ?: activeModel; updateStatus() }
         override fun onLiveUsage(contextTokens: Int, outputTokens: Int) = ui(gen) { liveCtx = contextTokens; liveOut = outputTokens; updateStatus() }
         override fun onRateLimits(limits: RateLimits) = ui(gen) { lastLimits = limits; applyLimits(limits) }
+        override fun onContextWindow(model: String, tokens: Int) = ui(gen) { contextWindows[model] = tokens; updateRing() }
+        override fun onRefineLost(texts: List<String>) = ui(gen) {
+            texts.forEach { body ->
+                val i = session.entries.indexOfLast { it.kind == Kind.USER && it.note != null }
+                if (i >= 0) session.entries.removeAt(i)
+                queue.add(0, refinedOriginals.remove(body.trim()) ?: body)
+            }
+            session.entries.add(Entry(Kind.NOTICE, "Précision arrivée trop tard (réponse presque terminée) : elle est envoyée juste après, comme message empilé."))
+            updateQueue()
+        }
         override fun onText(delta: String) = ui(gen) { append(Kind.TEXT, delta) }
         override fun onThinking(delta: String) = ui(gen) { append(Kind.THINKING, delta) }
         override fun onToolUse(id: String, name: String, input: JsonObject) = ui(gen) {
@@ -516,7 +655,14 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         alarm.addRequest({ tick() }, 1000)
     }
 
+    private fun updateRing() {
+        val window = contextWindows[activeModel ?: selectedModel] ?: 200_000
+        ring.percent = (liveCtx.toLong() * 100 / window).toInt()
+        ring.toolTipText = "Contexte : ${"%,d".format(liveCtx)} / ${"%,d".format(window)} tokens (${ring.percent} %)"
+    }
+
     private fun updateStatus() {
+        updateRing()
         val model = activeModel?.let { ModelCatalog.label(it) }
         cancelResumeLink.isVisible = resumeAt > 0
         if (resumeAt > 0) {
@@ -588,7 +734,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             quotaLine("Session de 5 h", fiveHourWindow(), now) + "<br/><br/>" +
             quotaLine("Semaine (7 jours)", weekWindow(), now) + "<br/><br/>" +
             "<b>Cette conversation</b><br/>" +
-            "Modèle : ${activeModel?.let { ModelCatalog.display(it) } ?: ModelCatalog.display(ModelCatalog.resolve(modelBox.editor.item?.toString().orEmpty()))}<br/>" +
+            "Modèle : ${activeModel?.let { ModelCatalog.display(it) } ?: ModelCatalog.display(selectedModel)}<br/>" +
             "Contexte : ${fmt(liveCtx)} tokens<br/>" +
             "Tokens cumulés : ↑ ${fmt(usageIn)} entrée · ↓ ${fmt(usageOut)} sortie<br/>" +
             (if (costUsd > 0) "Coût estimé : %.2f $<br/>".format(costUsd) else "") +
@@ -619,6 +765,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         streaming = false
         turn = null
         clearInteractions("Réponse terminée", deny = false)
+        refinedOriginals.clear()
         val until = if (isError && !interrupted && autoResumeOn && resumeAttempts < MAX_RESUMES)
             QuotaGuard.blockedUntil(lastLimits, message, System.currentTimeMillis() / 1000, settings.state.autoResumeDelayMin * 60L) else null
         if (!isError) resumeAttempts = 0
@@ -871,8 +1018,52 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun updateQueue() {
         queueRow.isVisible = queue.isNotEmpty()
-        queueLabel.text = "${queue.size} message(s) en attente (fusionnés à la fin de la réponse)"
-        queueRow.revalidate()
+        queueLabel.icon = AllIcons.Actions.MoveDown
+        queueLabel.text = "<html>En attente : ${esc(queuePreview(queue))}</html>"
+        queueLabel.toolTipText = if (queue.size > 1) "Cliquer pour voir et gérer les ${queue.size} messages en attente" else "Cliquer pour voir le message en attente"
+        queueRow.revalidate(); queueRow.repaint()
+    }
+
+    /** Détail de tous les messages empilés : lecture, ordre, suppression, envoi immédiat en précision. */
+    private fun showQueueDetails() {
+        if (queue.isEmpty()) return
+        val model = CollectionListModel<String>()
+        val list = com.intellij.ui.components.JBList(model)
+        val detail = JBTextArea(5, 50).apply { isEditable = false; lineWrap = true; wrapStyleWord = true }
+        var popup: com.intellij.openapi.ui.popup.JBPopup? = null
+        fun refresh(select: Int) {
+            model.replaceAll(queue.mapIndexed { i, m ->
+                "${i + 1}. " + m.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim().take(110) + if (m.lines().size > 1) " …" else ""
+            })
+            if (queue.isEmpty()) { popup?.cancel(); updateQueue(); return }
+            list.selectedIndex = select.coerceIn(0, queue.lastIndex)
+            updateQueue()
+        }
+        list.addListSelectionListener { detail.text = queue.getOrNull(list.selectedIndex).orEmpty(); detail.caretPosition = 0 }
+        fun btn(label: String, tip: String, run: (Int) -> Unit) = JButton(label).apply {
+            toolTipText = tip
+            addActionListener { val i = list.selectedIndex; if (i >= 0) run(i) }
+        }
+        val buttons = JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
+            add(btn("↑ Monter", "Envoyer plus tôt") { i -> refresh(queue.moveItem(i, i - 1)) })
+            add(btn("↓ Descendre", "Envoyer plus tard") { i -> refresh(queue.moveItem(i, i + 1)) })
+            add(btn("Supprimer", "Retirer de la file") { i -> queue.removeAt(i); refresh(i) })
+            add(btn("Préciser maintenant", "Injecter ce message dans la réponse en cours") { i -> val m = queue.removeAt(i); refresh(i); refine(m) })
+        }
+        val panel = JPanel(BorderLayout(0, 6)).apply {
+            border = JBUI.Borders.empty(8)
+            add(JBScrollPane(list).apply { preferredSize = java.awt.Dimension(JBUI.scale(520), JBUI.scale(130)) }, BorderLayout.NORTH)
+            add(JBScrollPane(detail), BorderLayout.CENTER)
+            add(JPanel(BorderLayout()).apply {
+                add(buttons, BorderLayout.NORTH)
+                add(JBLabel("Les messages en attente sont fusionnés et envoyés à la fin de la réponse.").apply { foreground = UIUtil.getContextHelpForeground() }, BorderLayout.SOUTH)
+            }, BorderLayout.SOUTH)
+        }
+        popup = JBPopupFactory.getInstance().createComponentPopupBuilder(panel, list)
+            .setTitle("Messages en attente").setRequestFocus(true).setResizable(true).setMovable(true).setCancelOnClickOutside(true)
+            .createPopup()
+        refresh(queue.lastIndex)          // par défaut : le dernier empilé est sélectionné et détaillé
+        popup.showInCenterOf(this)
     }
 
     private fun relPath(vf: com.intellij.openapi.vfs.VirtualFile): String {
@@ -953,7 +1144,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         usageLabel.text = parts.joinToString("  ")
     }
 
-    private fun resetUsage() { usageIn = 0; usageOut = 0; costUsd = 0.0; updateUsage() }
+    private fun resetUsage() { usageIn = 0; usageOut = 0; costUsd = 0.0; liveCtx = 0; liveOut = 0; updateUsage(); updateRing() }
 
     // ---------- Collage d'images, mentions @, recherche ----------
 
@@ -1070,7 +1261,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val oldValue = bar.value
         titleLabel.text = customTitle ?: session.title
         content?.displayName = tabTitle()
-        sendButton.text = if (streaming) "Empiler" else "Envoyer"
+        syncSend()
         view.text = Highlight.apply(buildHtml(), searchQuery)
         // FR-08 : ne pas faire sauter le défilement si l'utilisateur est remonté.
         SwingUtilities.invokeLater { bar.value = if (atBottom) bar.maximum else oldValue }
@@ -1118,6 +1309,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                     sb.append("<table width='100%' cellpadding='6' cellspacing='0'><tr><td bgcolor='${hex(userBg)}'>")
                     sb.append("<font color='gray' size='-1'><b>Vous</b>")
                     e.attached?.let { sb.append(" — joint : ${esc(it)}") }
+                    e.note?.let { sb.append(" — ${esc(it)}") }
                     sb.append("</font>").append(Md.toHtml(e.text)).append("</td></tr></table>")
                 }
                 else -> {

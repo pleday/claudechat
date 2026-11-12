@@ -18,6 +18,8 @@ class Entry(
     var result: String? = null,
     var isError: Boolean = false,
     val attached: String? = null,
+    /** Mention affichée à côté de « Vous » (ex. précision envoyée en cours de réponse). */
+    val note: String? = null,
 )
 
 /** Conversation en cours. L'identifiant est celui de la session de la CLI (RG-4). */

@@ -38,4 +38,33 @@ class RealCliIT {
         assertNull(r.error)
         assertNotNull(r.limits!!.fiveHour)
     }
+
+    @Test fun realRefineIsInjectedWithoutInterruption() {
+        val dir = java.nio.file.Files.createTempDirectory("ccg-refine")
+        for (c in "abcdef") java.nio.file.Files.writeString(dir.resolve("$c.txt"), (1..400).joinToString("\n") { "$c ligne $it" })
+        val text = StringBuilder()
+        val lost = CopyOnWriteArrayList<String>()
+        val results = java.util.concurrent.atomic.AtomicInteger()
+        val done = CountDownLatch(1)
+        lateinit var turn: CliTurn
+        val l = object : TurnListener {
+            override fun onText(delta: String) { text.append(delta) }
+            override fun onRefineLost(texts: List<String>) { lost += texts }
+            override fun onPermission(req: PermissionRequest) { turn.allow(req.requestId, req.input) }
+            override fun onDone(isError: Boolean, message: String?) { results.incrementAndGet(); done.countDown() }
+        }
+        val content = JsonArray().apply { add(JsonObject().apply {
+            addProperty("type", "text")
+            addProperty("text", "Lis les fichiers a.txt, b.txt, c.txt, d.txt, e.txt, f.txt UN PAR UN (un appel Read par fichier), puis conclus en une phrase en français.")
+        }) }
+        turn = CliTurn(TurnOptions(ClaudeSettings.defaultCli(), dir.toString(), "claude-haiku-5-5", "auto", "manual", null, "", emptyList()), content, l)
+        turn.start()
+        Thread.sleep(4000)
+        assertTrue(turn.refine("PRÉCISION : finalement conclus en ANGLAIS et ajoute le mot BANANA."))
+        assertTrue(done.await(90, TimeUnit.SECONDS))
+        println("REFINE: text=$text lost=$lost")
+        assertTrue(lost.isEmpty(), "la précision doit être consommée : $lost")
+        assertTrue("BANANA" in text, "la précision n'a pas été prise en compte : $text")
+        assertEquals(1, results.get())
+    }
 }

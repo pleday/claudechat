@@ -30,6 +30,7 @@ class ClaudeSettings : PersistentStateComponent<ClaudeSettings.State> {
         var system: String = ""
         var notify: Boolean = true
         var autoResume: Boolean = false
+        var busyMode: String = "refine"
         var autoResumeDelayMin: Int = 2
         var autoDiff: Boolean = true
         var telemetryConsent: Boolean = false

@@ -174,3 +174,18 @@ object QuotaProbeGate {
     fun tryStart() = running.compareAndSet(false, true)
     fun finish() = running.set(false)
 }
+
+/** Aperçu de la file d'attente : dernier message empilé (une ligne) et nombre des autres. */
+fun queuePreview(queue: List<String>, max: Int = 80): String {
+    val last = queue.lastOrNull()?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim() ?: return ""
+    val short = if (last.length > max) last.take(max - 1) + "…" else last
+    return if (queue.size > 1) "$short  (+${queue.size - 1} autre${if (queue.size > 2) "s" else ""})" else short
+}
+
+/** Déplace l'élément `from` à la position `to` (bornée) ; renvoie la nouvelle position. */
+fun <T> MutableList<T>.moveItem(from: Int, to: Int): Int {
+    if (from !in indices) return from
+    val dest = to.coerceIn(0, lastIndex)
+    add(dest, removeAt(from))
+    return dest
+}

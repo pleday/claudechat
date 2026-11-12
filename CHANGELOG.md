@@ -1,5 +1,12 @@
 # Changelog
 
+## Non publié
+
+- Zone de saisie refondue : carte à bordure d'accent, « + », permissions, fichier courant (cliquable), modèle/effort, anneau de contexte, bouton d'envoi rond avec menu « Mettre en file d'attente / Préciser l'exécution en cours »
+- **Préciser** une réponse en cours : le message est injecté au prochain point d'arrêt de Claude, sans l'interrompre (Ctrl+Entrée ou menu du bouton)
+- Bouton d'envoi avec icône et menu déroulant **Empiler / Préciser** pendant une réponse
+- File d'attente visible : le dernier message empilé s'affiche, un clic ouvre le détail de tous (ordre, suppression, envoi immédiat en précision)
+
 ## 0.5.0 — première release
 
 Réécriture complète : le plugin pilote désormais la CLI `claude` (plus de clé API).

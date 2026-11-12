@@ -69,6 +69,10 @@ interface TurnListener {
     /** Tokens en direct : taille du contexte et tokens de sortie cumulés du tour. */
     fun onLiveUsage(contextTokens: Int, outputTokens: Int) {}
     fun onRateLimits(limits: RateLimits) {}
+    /** Taille de la fenêtre de contexte du modèle (fournie avec le résultat). */
+    fun onContextWindow(model: String, tokens: Int) {}
+    /** Précisions envoyées mais non consommées avant la fin du tour : à renvoyer comme nouveau message. */
+    fun onRefineLost(texts: List<String>) {}
     fun onDone(isError: Boolean, message: String?) {}
 }
 
@@ -81,12 +85,14 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
     private var proc: Process? = null
     private var out: BufferedWriter? = null
     @Volatile private var killed = false
+    @Volatile private var ended = false
+    private val refinements = java.util.concurrent.CopyOnWriteArrayList<String>()
     private val stderr = StringBuffer()
 
     fun start() {
         val cmd = mutableListOf(
             o.cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json",
-            "--verbose", "--include-partial-messages", "--permission-prompt-tool", "stdio",
+            "--verbose", "--include-partial-messages", "--replay-user-messages", "--permission-prompt-tool", "stdio",
             "--permission-mode", o.permissionMode,
         )
         if (o.model.isNotBlank()) cmd += listOf("--model", o.model)
@@ -125,10 +131,17 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                         val bo = b.asJsonObject
                         if (bo["type"]?.asString == "tool_use") l.onToolUse(bo["id"].asString, bo["name"].asString, bo["input"]?.asJsonObject ?: JsonObject())
                     }
-                    "user" -> j["message"]?.asJsonObject?.get("content")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { b ->
-                        val bo = b.asJsonObject
-                        if (bo["type"]?.asString == "tool_result")
-                            l.onToolResult(bo["tool_use_id"].asString, SessionStore.resultText(bo["content"]), bo["is_error"]?.asBoolean == true)
+                    "user" -> {
+                        val c = j["message"]?.asJsonObject?.get("content")
+                        if (c != null && c.isJsonPrimitive) refinements.remove(c.asString.trim())
+                        else if (c != null && c.isJsonArray) c.asJsonArray.forEach { b ->
+                            val bo = b.asJsonObject
+                            when (bo["type"]?.asString) {
+                                "tool_result" -> l.onToolResult(bo["tool_use_id"].asString, SessionStore.resultText(bo["content"]), bo["is_error"]?.asBoolean == true)
+                                // la CLI rejoue le message quand elle le prend en compte : la précision est consommée
+                                "text" -> refinements.remove(bo["text"]?.asString?.trim())
+                            }
+                        }
                     }
                     "rate_limit_event" -> parseRateLimits(j)?.let(l::onRateLimits)
                     "control_request" -> {
@@ -141,7 +154,11 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                         }
                     }
                     "result" -> {
-                        finished = true
+                        finished = true; ended = true
+                        refinements.toList().takeIf { it.isNotEmpty() }?.let { refinements.clear(); l.onRefineLost(it) }
+                        j["modelUsage"]?.takeIf { it.isJsonObject }?.asJsonObject?.entrySet()?.forEach { (m, v) ->
+                            v.takeIf { it.isJsonObject }?.asJsonObject?.get("contextWindow")?.takeIf { it.isJsonPrimitive }?.asInt?.let { l.onContextWindow(m, it) }
+                        }
                         (j["usage"]?.asJsonObject ?: JsonObject()).let { u ->
                             l.onUsage(u["input_tokens"]?.asInt ?: 0, u["output_tokens"]?.asInt ?: 0, j["total_cost_usd"]?.asDouble ?: 0.0)
                         }
@@ -184,6 +201,24 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
 
     @Synchronized private fun send(o: JsonObject) {
         runCatching { out?.apply { write(o.toString()); newLine(); flush() } }
+    }
+
+    /**
+     * Précise la consigne pendant que Claude travaille : le message est injecté au prochain point d'arrêt
+     * (priority "next"), sans interrompre. Renvoie false si le tour est déjà terminé.
+     */
+    fun refine(text: String): Boolean {
+        if (ended || killed || proc?.isAlive != true) return false
+        refinements += text.trim()
+        send(JsonObject().apply {
+            addProperty("type", "user")
+            add("message", JsonObject().apply {
+                addProperty("role", "user")
+                add("content", JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", text) }) })
+            })
+            addProperty("priority", "next")
+        })
+        return true
     }
 
     fun allow(requestId: String, updatedInput: JsonObject) = respond(requestId, JsonObject().apply {

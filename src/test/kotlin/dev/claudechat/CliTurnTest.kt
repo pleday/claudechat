@@ -221,3 +221,78 @@ echo '{"type":"result","is_error":false}'""")
 
     @Test fun reportsMissingCli() = assertTrue(CliTurn.probeQuota("/nonexistent/claude", tmp.toString()).error!!.startsWith("impossible de lancer"))
 }
+
+class RefineTest {
+    @TempDir lateinit var tmp: Path
+
+    private fun fake(body: String): String {
+        org.junit.jupiter.api.Assumptions.assumeTrue(!System.getProperty("os.name").lowercase().contains("win"))
+        val f = tmp.resolve("claude"); Files.writeString(f, "#!/bin/bash\n$body\n"); f.toFile().setExecutable(true); return f.toString()
+    }
+
+    private class Rec : TurnListener {
+        val lost = CopyOnWriteArrayList<String>()
+        val done = CountDownLatch(1)
+        override fun onRefineLost(texts: List<String>) { lost += texts }
+        override fun onDone(isError: Boolean, message: String?) = done.countDown()
+    }
+
+    private val content = JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", "go") }) }
+    private fun opts(cli: String) = TurnOptions(cli, tmp.toString(), "", "auto", "manual", null, "", emptyList())
+
+    @Test fun refineSendsNextPriorityMessageAndIsConsumedWhenReplayed() {
+        val got = tmp.resolve("second.txt")
+        val cli = fake("""read -r first
+read -r -t 5 second; echo "${'$'}second" > $got
+echo '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"plus court"}]}}'
+echo '{"type":"result","is_error":false}'""")
+        val rec = Rec(); val t = CliTurn(opts(cli), content, rec); t.start()
+        assertTrue(t.refine("plus court"))
+        assertTrue(rec.done.await(15, TimeUnit.SECONDS))
+        val sent = com.google.gson.JsonParser.parseString(Files.readString(got)).asJsonObject
+        assertEquals("next", sent["priority"].asString)
+        assertEquals("plus court", sent["message"].asJsonObject["content"].asJsonArray[0].asJsonObject["text"].asString)
+        assertTrue(rec.lost.isEmpty(), "précision consommée : rien à renvoyer")
+    }
+
+    @Test fun refineNotConsumedBeforeResultIsReportedLost() {
+        val cli = fake("""read -r first
+read -r -t 5 second
+echo '{"type":"result","is_error":false}'""")
+        val rec = Rec(); val t = CliTurn(opts(cli), content, rec); t.start()
+        assertTrue(t.refine("trop tard"))
+        assertTrue(rec.done.await(15, TimeUnit.SECONDS))
+        assertEquals(listOf("trop tard"), rec.lost.toList())
+    }
+
+    @Test fun refineAfterTurnEndedReturnsFalse() {
+        val cli = fake("""read -r first; echo '{"type":"result","is_error":false}'""")
+        val rec = Rec(); val t = CliTurn(opts(cli), content, rec); t.start()
+        assertTrue(rec.done.await(15, TimeUnit.SECONDS))
+        assertFalse(t.refine("après"))
+    }
+}
+
+class ContextWindowTest {
+    @TempDir lateinit var tmp: Path
+
+    @Test fun reportsContextWindowFromResult() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(!System.getProperty("os.name").lowercase().contains("win"))
+        val f = tmp.resolve("claude")
+        Files.writeString(f, """#!/bin/bash
+read -r line
+echo '{"type":"result","is_error":false,"modelUsage":{"claude-haiku-5-5":{"contextWindow":1000000,"inputTokens":3}}}'
+""")
+        f.toFile().setExecutable(true)
+        val got = CopyOnWriteArrayList<Pair<String, Int>>()
+        val done = CountDownLatch(1)
+        val l = object : TurnListener {
+            override fun onContextWindow(model: String, tokens: Int) { got += model to tokens }
+            override fun onDone(isError: Boolean, message: String?) = done.countDown()
+        }
+        val content = JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", "x") }) }
+        CliTurn(TurnOptions(f.toString(), tmp.toString(), "", "auto", "manual", null, "", emptyList()), content, l).start()
+        assertTrue(done.await(15, TimeUnit.SECONDS))
+        assertEquals(listOf("claude-haiku-5-5" to 1_000_000), got.toList())
+    }
+}

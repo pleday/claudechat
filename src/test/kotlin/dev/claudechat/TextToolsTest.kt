@@ -145,3 +145,24 @@ class ChunkTextTest {
 
     @Test fun hardCutsWhenNoSeparator() = assertEquals(listOf("aaaa", "aaaa", "aa"), chunkText("a".repeat(10), 4))
 }
+
+class QueueToolsTest {
+    @Test fun previewShowsLastMessageAndCountOfOthers() {
+        assertEquals("", queuePreview(emptyList()))
+        assertEquals("dernier", queuePreview(listOf("dernier")))
+        assertEquals("c  (+2 autres)", queuePreview(listOf("a", "b", "c")))
+        assertEquals("b  (+1 autre)", queuePreview(listOf("a", "b")))
+    }
+
+    @Test fun previewTruncatesAndKeepsFirstLine() {
+        assertEquals("ligne un", queuePreview(listOf("\nligne un\nligne deux")))
+        assertTrue(queuePreview(listOf("x".repeat(200)), 20).length <= 20)
+    }
+
+    @Test fun moveItemReordersAndClamps() {
+        val l = mutableListOf("a", "b", "c")
+        assertEquals(0, l.moveItem(2, 0)); assertEquals(listOf("c", "a", "b"), l)
+        assertEquals(2, l.moveItem(0, 99)); assertEquals(listOf("a", "b", "c"), l)
+        assertEquals(5, l.moveItem(5, 0), "index invalide ignoré")
+    }
+}
