@@ -78,6 +78,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var interrupted = false
     private var forkNext = false
     private var remoteOn = settings.state.remoteDefault
+    private val phoneSink = object : RemoteHub.Sink {
+        override fun onPhoneMessage(text: String) {
+            ApplicationManager.getApplication().invokeLater({ receivePhone(text) }, ModalityState.any())
+        }
+    }
     var content: com.intellij.ui.content.Content? = null
     private var customTitle: String? = null
     private var activeModel: String? = null
@@ -306,10 +311,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         render(forceBottom = true)
         updateUsage()
         updateQuota(); updateStatus()
+        if (remoteOn) RemoteBridge.register(phoneSink)
         ApplicationManager.getApplication().executeOnPooledThread { RemoteBridge.ensureStarted() }
     }
 
-    fun shutdown() { resumeAt = 0; abandonTurn() }
+    fun shutdown() { resumeAt = 0; RemoteBridge.unregister(phoneSink); abandonTurn() }
 
     // ---------- Barre d'outils ----------
 
@@ -329,14 +335,14 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun newSession() {
         abandonTurn()
-        cancelResume(); session = Session(); customTitle = null; resetUsage(); allowAll = false; remoteOn = settings.state.remoteDefault
+        cancelResume(); session = Session(); customTitle = null; resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
         render(forceBottom = true)
         input.requestFocusInWindow()
     }
 
     fun loadSession(s: Session) {
         abandonTurn()
-        cancelResume(); session = s; customTitle = null; allowAll = false; remoteOn = settings.state.remoteDefault
+        cancelResume(); session = s; customTitle = null; allowAll = false; applyRemote(settings.state.remoteDefault)
         resetUsage()
         render(forceBottom = true)
     }
@@ -600,7 +606,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             if (remoteOn) RemoteBridge.notifyPhone("⏸ [${project.name}] Quota atteint, reprise automatique prévue.")
         }
         if (settings.state.notify && !interrupted) Notifier.info(project, "Claude a terminé : ${session.title}")
-        if (remoteOn && !interrupted && !isError) RemoteBridge.notifyPhone("✔ [${project.name}] Claude a terminé : ${session.title}")
+        if (remoteOn && !interrupted && !isError) {
+            val answer = finalAnswer().ifEmpty { "(aucune réponse textuelle)" }
+            RemoteBridge.say(phoneSink, "✔ [${project.name} · ${session.title.take(40)}] Claude a terminé :\n\n$answer\n\n↩ Réponds à ce message pour continuer la conversation.")
+        } else if (remoteOn && !interrupted && until == null) {
+            RemoteBridge.say(phoneSink, "⚠ [${project.name}] Erreur : ${message ?: "inconnue"}")
+        }
         render()
         if (queue.isNotEmpty() && resumeAt == 0L) {
             val merged = queue.joinToString("\n\n"); queue.clear(); updateQueue()
@@ -647,6 +658,32 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
     }
 
+    private fun applyRemote(on: Boolean) {
+        remoteOn = on
+        if (on) RemoteBridge.register(phoneSink) else RemoteBridge.unregister(phoneSink)
+    }
+
+    /** Message libre reçu du téléphone : devient un message de l'utilisateur (ou attend la fin de la réponse). */
+    private fun receivePhone(text: String) {
+        if (!remoteOn) return
+        if (streaming) {
+            queue.add(text); updateQueue()
+            RemoteBridge.say(phoneSink, "📨 Claude est encore au travail : ton message est en file d'attente.")
+        } else {
+            session.entries.add(Entry(Kind.NOTICE, "📱 Message reçu du téléphone."))
+            RemoteBridge.say(phoneSink, "▶ Envoyé à Claude.")
+            skipAttachOnce = true
+            dispatch(text)
+        }
+    }
+
+    /** Réponse finale à renvoyer au téléphone : le texte après le dernier outil, sinon le dernier texte. */
+    private fun finalAnswer(): String {
+        val tail = session.entries.takeLastWhile { it.kind != Kind.USER }
+        val afterTool = tail.takeLastWhile { it.kind != Kind.TOOL }.filter { it.kind == Kind.TEXT }
+        return (afterTool.ifEmpty { tail.filter { it.kind == Kind.TEXT }.takeLast(1) }).joinToString("\n\n") { it.text }.trim()
+    }
+
     /** Active ou coupe l'envoi des demandes de cette conversation vers le téléphone. */
     private fun setRemote(on: Boolean) {
         if (on && !RemoteBridge.isPaired()) {
@@ -654,7 +691,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             if (ShowSettingsUtil.getInstance().editConfigurable(project, ClaudeConfigurable())) { /* réglages fermés */ }
             if (!RemoteBridge.isPaired()) return
         }
-        remoteOn = on
+        applyRemote(on)
         val all = listOfNotNull(current) + pending
         if (on) all.forEach { attachRemote(it, generation) }
         else all.forEach { it.handle?.cancel("Accès à distance désactivé pour cette conversation"); it.handle = null }

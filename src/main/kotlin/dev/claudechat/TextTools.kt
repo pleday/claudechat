@@ -154,3 +154,16 @@ object QuotaGuard {
         return target + delaySec
     }
 }
+
+/** Découpe un long texte en morceaux d'au plus `max` caractères, de préférence aux sauts de ligne. */
+fun chunkText(text: String, max: Int = 3800): List<String> {
+    val out = mutableListOf<String>()
+    var rest = text.trim()
+    while (rest.length > max) {
+        var cut = rest.lastIndexOf('\n', max).takeIf { it > max / 2 } ?: rest.lastIndexOf(' ', max).takeIf { it > max / 2 } ?: max
+        out += rest.substring(0, cut).trimEnd()
+        rest = rest.substring(cut).trimStart()
+    }
+    if (rest.isNotEmpty()) out += rest
+    return out
+}

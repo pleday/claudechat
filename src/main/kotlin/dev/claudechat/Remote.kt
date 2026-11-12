@@ -23,7 +23,7 @@ class TelegramBot(
 ) {
     interface Handler {
         fun onCallback(data: String)
-        fun onText(text: String)
+        fun onText(text: String, replyTo: Int?)
         fun onPaired(chatId: Long)
     }
 
@@ -118,7 +118,7 @@ class TelegramBot(
             } else send("Code d'appairage invalide ou expiré.", to = chat)
             return
         }
-        if (chat == chatId) handler.onText(text)
+        if (chat == chatId) handler.onText(text, msg["reply_to_message"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("message_id")?.asInt)
     }
 }
 
@@ -133,6 +133,27 @@ class RemoteHub : TelegramBot.Handler {
 
     private class Pending(val title: String, val options: List<String>, val freeText: Boolean, val onAnswer: (String) -> Unit) {
         @Volatile var messageId: Int? = null
+    }
+
+    /** Une conversation (onglet) qui échange des messages libres avec le téléphone. */
+    interface Sink { fun onPhoneMessage(text: String) }
+
+    private val sinks = LinkedHashSet<Sink>()
+    private val owners = object : LinkedHashMap<Int, Sink>() {
+        override fun removeEldestEntry(e: MutableMap.MutableEntry<Int, Sink>?) = size > 300
+    }
+    @Volatile private var lastActive: Sink? = null
+
+    fun register(s: Sink) { synchronized(pendings) { sinks += s } }
+    fun unregister(s: Sink) { synchronized(pendings) { sinks -= s; if (lastActive === s) lastActive = null; owners.values.removeAll { it === s } } }
+
+    /** Envoie un message libre de la part d'une conversation ; une réponse (ou « répondre ») y sera routée. */
+    fun say(sink: Sink, text: String) {
+        if (!paired) return
+        for (part in chunkText(text)) {
+            val id = bot.send(part)
+            synchronized(pendings) { if (id != null) owners[id] = sink; lastActive = sink }
+        }
     }
 
     lateinit var bot: TelegramBot
@@ -175,14 +196,26 @@ class RemoteHub : TelegramBot.Handler {
         runCatching { p.onAnswer(choice) }
     }
 
-    override fun onText(text: String) {
-        val entry = synchronized(pendings) {
-            pendings.entries.lastOrNull { it.value.freeText }?.also { pendings.remove(it.key) }
+    override fun onText(text: String, replyTo: Int?) {
+        // 1) réponse explicite à un message d'une conversation ; 2) question en attente ; 3) dernière conversation active
+        val target: Sink?
+        var pendingEntry: Map.Entry<String, Pending>? = null
+        synchronized(pendings) {
+            val byReply = replyTo?.let { owners[it] }
+            if (byReply != null) target = byReply
+            else {
+                pendingEntry = pendings.entries.lastOrNull { it.value.freeText }?.also { pendings.remove(it.key) }
+                target = if (pendingEntry != null) null else (lastActive?.takeIf { it in sinks } ?: sinks.singleOrNull())
+            }
         }
-        if (entry == null) { bot.send("Aucune question en attente."); return }
-        val p = entry.value
-        p.messageId?.let { bot.edit(it, "✅ ${p.title}\n→ ${text.take(200)} (depuis le téléphone)") }
-        runCatching { p.onAnswer(text) }
+        pendingEntry?.value?.let { p ->
+            p.messageId?.let { bot.edit(it, "✅ ${p.title}\n→ ${text.take(200)} (depuis le téléphone)") }
+            runCatching { p.onAnswer(text) }
+            return
+        }
+        if (target == null) { bot.send("Aucune conversation à distance active (active l'interrupteur 📱 dans l'IDE)."); return }
+        synchronized(pendings) { lastActive = target }
+        runCatching { target.onPhoneMessage(text) }
     }
 
     override fun onPaired(chatId: Long) = onPairedCallback(chatId)
@@ -191,6 +224,7 @@ class RemoteHub : TelegramBot.Handler {
 /** Point d'accès unique, configuré depuis les réglages. */
 object RemoteBridge {
     @Volatile private var hub: RemoteHub? = null
+    private val sinks = LinkedHashSet<RemoteHub.Sink>()
     @Volatile private var started = false
 
     /** Démarre une seule fois par IDE (plusieurs onglets partagent le même bot). */
@@ -206,6 +240,7 @@ object RemoteBridge {
         val h = RemoteHub()
         h.bot = TelegramBot(token, s.state.telegramChatId.toLongOrNull(), h)
         h.onPairedCallback = { s.state.telegramChatId = it.toString() }
+        synchronized(sinks) { sinks.forEach(h::register) }
         h.start()
         hub = h
     }
@@ -214,6 +249,11 @@ object RemoteBridge {
         hub?.offer(title, body, options, freeText, onAnswer)
 
     fun notifyPhone(text: String) { hub?.send(text) }
+
+    /** Les conversations inscrites survivent à une reconfiguration du bot. */
+    fun register(s: RemoteHub.Sink) { synchronized(sinks) { sinks += s }; hub?.register(s) }
+    fun unregister(s: RemoteHub.Sink) { synchronized(sinks) { sinks -= s }; hub?.unregister(s) }
+    fun say(s: RemoteHub.Sink, text: String) { hub?.say(s, text) }
 
     /** Génère un code d'appairage ; null si le bot n'est pas actif. */
     fun newPairingCode(): String? {

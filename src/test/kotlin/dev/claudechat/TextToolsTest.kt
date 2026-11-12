@@ -132,3 +132,16 @@ class QuotaGuardTest {
         assertEquals("rejected", r.status); assertEquals("five_hour", r.limitType); assertEquals(123L, r.resetsAt)
     }
 }
+
+class ChunkTextTest {
+    @Test fun shortTextIsOneChunk() = assertEquals(listOf("abc"), chunkText("abc", 10))
+
+    @Test fun splitsOnNewlinesAndKeepsEverything() {
+        val text = (1..50).joinToString("\n") { "ligne $it" }
+        val parts = chunkText(text, 100)
+        assertTrue(parts.size > 1 && parts.all { it.length <= 100 })
+        assertEquals(text.filter { !it.isWhitespace() }, parts.joinToString("").filter { !it.isWhitespace() })
+    }
+
+    @Test fun hardCutsWhenNoSeparator() = assertEquals(listOf("aaaa", "aaaa", "aa"), chunkText("a".repeat(10), 4))
+}

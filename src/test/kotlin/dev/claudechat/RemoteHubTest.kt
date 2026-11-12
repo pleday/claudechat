@@ -56,9 +56,17 @@ class RemoteHubTest {
 
     @AfterEach fun tearDown() { hub.stop(); server.stop(0) }
 
-    private fun msg(chat: Long, text: String) = JsonObject().apply {
+    private fun msg(chat: Long, text: String, replyTo: Int? = null) = JsonObject().apply {
         addProperty("update_id", updateId++)
-        add("message", JsonObject().apply { add("chat", JsonObject().apply { addProperty("id", chat) }); addProperty("text", text) })
+        add("message", JsonObject().apply {
+            add("chat", JsonObject().apply { addProperty("id", chat) }); addProperty("text", text)
+            replyTo?.let { add("reply_to_message", JsonObject().apply { addProperty("message_id", it) }) }
+        })
+    }
+
+    private class FakeSink : RemoteHub.Sink {
+        val got = LinkedBlockingQueue<String>()
+        override fun onPhoneMessage(text: String) { got.add(text) }
     }
 
     private fun click(chat: Long, data: String) = JsonObject().apply {
@@ -143,9 +151,58 @@ class RemoteHubTest {
         assertNull(hub.offer("Q", "", listOf("Oui"), false) {})
     }
 
-    @Test fun textWithoutPendingQuestionIsAnswered() {
+    @Test fun textWithoutAnyConversationIsAnswered() {
         updates.add(msg(42, "salut"))
-        await { sent.any { "Aucune question" in it["text"].asString } }
+        await { sent.any { "Aucune conversation" in it["text"].asString } }
+    }
+
+    @Test fun replyAfterFinalMessageGoesBackToTheConversation() {
+        val tab = FakeSink(); hub.register(tab)
+        hub.say(tab, "J'ai terminé. Veux-tu que je continue ?")
+        assertTrue("terminé" in sent.last()["text"].asString)
+        updates.add(msg(42, "oui, continue"))
+        assertEquals("oui, continue", tab.got.poll(5, TimeUnit.SECONDS))
+    }
+
+    @Test fun replyToRoutesToTheRightTab() {
+        val a = FakeSink(); val b = FakeSink(); hub.register(a); hub.register(b)
+        hub.say(a, "message de A")          // id 100
+        val idA = nextId - 1
+        hub.say(b, "message de B")          // dernier actif = B
+        updates.add(msg(42, "pour A", replyTo = idA))
+        assertEquals("pour A", a.got.poll(5, TimeUnit.SECONDS))
+        updates.add(msg(42, "sans reply"))
+        assertEquals("sans reply", a.got.poll(5, TimeUnit.SECONDS), "sans « répondre » : l'onglet avec lequel on vient d'échanger")
+        assertNull(b.got.poll(300, TimeUnit.MILLISECONDS))
+        hub.say(b, "B reprend la parole")
+        updates.add(msg(42, "maintenant B"))
+        assertEquals("maintenant B", b.got.poll(5, TimeUnit.SECONDS))
+    }
+
+    @Test fun pendingQuestionTakesPrecedenceOverLastActiveTab() {
+        val tab = FakeSink(); hub.register(tab)
+        hub.say(tab, "fini")
+        val answers = LinkedBlockingQueue<String>()
+        hub.offer("Q", "Quelle couleur ?", listOf("Rouge"), true) { answers.add(it) }
+        updates.add(msg(42, "Bleu"))
+        assertEquals("Bleu", answers.poll(5, TimeUnit.SECONDS))
+        assertNull(tab.got.poll(300, TimeUnit.MILLISECONDS))
+    }
+
+    @Test fun unregisteredTabNoLongerReceives() {
+        val tab = FakeSink(); hub.register(tab)
+        hub.say(tab, "fini"); hub.unregister(tab)
+        updates.add(msg(42, "tard"))
+        assertNull(tab.got.poll(500, TimeUnit.MILLISECONDS))
+        await { sent.any { "Aucune conversation" in it["text"].asString } }
+    }
+
+    @Test fun longAnswerIsSplitIntoSeveralMessages() {
+        val tab = FakeSink(); hub.register(tab)
+        val before = sent.size
+        hub.say(tab, (1..400).joinToString("\n") { "ligne $it avec un peu de texte pour remplir" })
+        assertTrue(sent.size - before >= 2)
+        assertTrue(sent.drop(before).all { it["text"].asString.length <= 3900 })
     }
 
     @Test fun describeToolShowsEditDiff() {
