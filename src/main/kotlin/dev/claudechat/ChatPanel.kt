@@ -270,11 +270,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         showAbove(popup, anchor, right)
     }
 
-    private fun choice(text: String, desc: String?, selected: () -> Boolean, set: () -> Unit) = object : ToggleAction(text, desc, null) {
-        override fun getActionUpdateThread() = ActionUpdateThread.EDT
-        override fun isSelected(e: AnActionEvent) = selected()
-        override fun setSelected(e: AnActionEvent, state: Boolean) { if (state) set() }
-    }
+    private fun choice(text: String, desc: String?, selected: () -> Boolean, set: () -> Unit) = panelChoice(text, desc, selected, set)
 
     private fun showModeMenu(anchor: java.awt.Component) {
         val g = DefaultActionGroup()
@@ -435,19 +431,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     // ---------- Barre d'outils ----------
 
-    private fun action(text: String, icon: Icon, enabled: () -> Boolean = { true }, run: () -> Unit) =
-        object : DumbAwareAction(text, null, icon) {
-            override fun getActionUpdateThread() = ActionUpdateThread.EDT
-            override fun update(e: AnActionEvent) { e.presentation.isEnabled = enabled() }
-            override fun actionPerformed(e: AnActionEvent) = run()
-        }
+    private fun action(text: String, icon: Icon, enabled: () -> Boolean = { true }, run: () -> Unit) = panelAction(text, icon, enabled, run)
 
-    private fun toggle(text: String, icon: Icon, get: () -> Boolean, set: (Boolean) -> Unit) =
-        object : ToggleAction(text, null, icon) {
-            override fun getActionUpdateThread() = ActionUpdateThread.EDT
-            override fun isSelected(e: AnActionEvent) = get()
-            override fun setSelected(e: AnActionEvent, state: Boolean) = set(state)
-        }
+    private fun toggle(text: String, icon: Icon, get: () -> Boolean, set: (Boolean) -> Unit) = panelToggle(text, icon, get, set)
 
     private fun newSession() {
         abandonTurn()
