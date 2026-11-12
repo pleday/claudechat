@@ -67,4 +67,33 @@ class RealCliIT {
         assertTrue("BANANA" in text, "la précision n'a pas été prise en compte : $text")
         assertEquals(1, results.get())
     }
+
+    @Test fun realVideoFramesAreUnderstood() {
+        val ffmpeg = VideoTools.find("ffmpeg") ?: return
+        val dir = java.nio.file.Files.createTempDirectory("ccg-video")
+        val video = dir.resolve("demo.mp4").toString()
+        // vidéo de test : mire colorée avec un compteur de secondes incrusté
+        val p = ProcessBuilder(ffmpeg, "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=6:size=640x360:rate=10", "-pix_fmt", "yuv420p", video).start()
+        assertEquals(0, p.waitFor())
+        val (text, frames) = VideoTools.attach(video, "demo.mp4")
+        assertTrue(frames.isNotEmpty())
+        val content = JsonArray()
+        frames.forEach { f ->
+            content.add(JsonObject().apply {
+                addProperty("type", "image")
+                add("source", JsonObject().apply { addProperty("type", "base64"); addProperty("media_type", "image/jpeg"); addProperty("data", java.util.Base64.getEncoder().encodeToString(f)) })
+            })
+        }
+        content.add(JsonObject().apply { addProperty("type", "text"); addProperty("text", text + "\n\nDécris en une phrase ce que montre cette vidéo.") })
+        val out = StringBuilder(); val done = CountDownLatch(1); var err = false
+        val l = object : TurnListener {
+            override fun onText(delta: String) { out.append(delta) }
+            override fun onDone(isError: Boolean, message: String?) { err = isError; done.countDown() }
+        }
+        CliTurn(TurnOptions(ClaudeSettings.defaultCli(), dir.toString(), "claude-haiku-5-5", "auto", "manual", null, "", emptyList()), content, l).start()
+        assertTrue(done.await(90, TimeUnit.SECONDS))
+        println("VIDEO: frames=${frames.size} réponse=$out")
+        assertFalse(err)
+        assertTrue(out.isNotBlank(), "Claude doit répondre")
+    }
 }
