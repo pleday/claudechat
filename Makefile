@@ -1,7 +1,7 @@
 # Commandes courantes ; tout passe par le wrapper Gradle (aucune installation de Gradle requise).
 GRADLE := ./gradlew
 
-.PHONY: help build test plugin run verify clean
+.PHONY: help build test plugin run verify clean repo
 
 help: ## Liste des commandes
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/ —/'
@@ -24,3 +24,6 @@ verify: ## Vérifie la structure du plugin (plugin.xml, compatibilité)
 
 clean: ## Supprime les fichiers générés
 	$(GRADLE) clean
+
+repo: ## Régénère updatePlugins.xml (dépôt de mises à jour) pour le dernier tag
+	./scripts/update-repo.sh

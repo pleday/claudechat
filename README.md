@@ -36,3 +36,12 @@ Voir la spec fonctionnelle (FR-xx) pour le périmètre ; les exigences non couve
 Ensuite, active l'interrupteur 📱 de la barre d'outils **dans la conversation voulue** (désactivé par défaut, réglable). Pour cette conversation, chaque demande d'autorisation, plan ou question arrive sur le téléphone avec des boutons
 (réponse libre possible pour les questions). La première réponse, depuis l'IDE ou le téléphone, l'emporte.
 Seul le chat appairé est écouté. Le contenu des demandes transite par Telegram.
+
+## Mises à jour dans l'IDE
+Le plugin n'étant pas sur le JetBrains Marketplace, l'IDE ne sait pas où chercher ses mises à jour
+(« Cannot update plugin: unable to identify where Claude Chat was installed from »). On lui indique un dépôt personnalisé :
+
+1. *Réglages > Plugins > ⚙ > Manage Plugin Repositories… > +*
+2. Ajouter : `https://raw.githubusercontent.com/pleday/claudechat/main/updatePlugins.xml`
+
+Après chaque release : `make repo` régénère `updatePlugins.xml` pour le dernier tag ; le commiter et le pousser.

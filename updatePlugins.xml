@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugins>
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.6.0/claude-chat-0.6.0.zip" version="0.6.0">
+    <idea-version since-build="243"/>
+    <name>Claude Chat</name>
+    <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
+    <change-notes><![CDATA[<ul>
+<li>Écran d'accueil à chaque nouvel onglet : portrait (ressource <code>images/avatar.png</code>, remplaçable) et astuces qui tournent</li>
+<li>Transcript plus lisible : « Vous » et « Claude » en gras et en couleur, barre d'accent, modèle affiché à côté de Claude</li>
+<li>Pièces jointes <b>vidéo</b> (mp4, mov, webm, mkv, avi…) : images extraites avec ffmpeg et envoyées à Claude avec les instants (la piste audio n'est pas transmise)</li>
+<li>Zone de saisie refondue : carte à bordure d'accent, « + », permissions, fichier courant (cliquable), modèle/effort, anneau de contexte, bouton d'envoi rond avec menu « Mettre en file d'attente / Préciser l'exécution en cours »</li>
+<li><b>Préciser</b> une réponse en cours : le message est injecté au prochain point d'arrêt de Claude, sans l'interrompre (Ctrl+Entrée ou menu du bouton)</li>
+<li>File d'attente visible : le dernier message empilé s'affiche, un clic ouvre le détail de tous (ordre, suppression, envoi immédiat en précision)</li>
+</ul>]]></change-notes>
+  </plugin>
+</plugins>
