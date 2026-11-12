@@ -18,6 +18,14 @@ class ChatToolWindowFactory : ToolWindowFactory, DumbAware {
             override fun actionPerformed(e: AnActionEvent) { openTab(project, null) }
         }))
         addTab(project, toolWindow)
+        // Fermer le dernier onglet en recrée un vierge, pour que la fenêtre ne reste jamais vide.
+        toolWindow.contentManager.addContentManagerListener(object : com.intellij.ui.content.ContentManagerListener {
+            override fun contentRemoved(event: com.intellij.ui.content.ContentManagerEvent) {
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                    if (!toolWindow.isDisposed && toolWindow.contentManager.contentCount == 0) addTab(project, toolWindow)
+                }
+            }
+        })
     }
 
     companion object {
