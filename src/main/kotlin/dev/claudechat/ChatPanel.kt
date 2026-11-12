@@ -135,6 +135,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
     }
     private val scroll = JBScrollPane(view)
+    private val welcome = WelcomePanel(Avatar.load())
+    private val transcriptCards = JPanel(java.awt.CardLayout()).apply {
+        add(scroll, "chat")
+        add(JBScrollPane(welcome).apply { border = JBUI.Borders.empty() }, "welcome")
+    }
     private val input = object : JBTextArea(3, 20) {
         override fun paste() {
             if (!pasteImage()) super.paste()
@@ -399,7 +404,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         val splitter = JBSplitter(true, 0.78f).apply {
             firstComponent = JPanel(BorderLayout()).apply {
-                add(scroll, BorderLayout.CENTER)
+                add(transcriptCards, BorderLayout.CENTER)
                 add(JPanel(BorderLayout()).apply { add(JPanel(BorderLayout()).apply {
                     add(statusLabel, BorderLayout.CENTER)
                     add(JPanel(FlowLayout(FlowLayout.RIGHT, 2, 0)).apply { add(cancelResumeLink); add(usageLabel); add(batteryLabel) }, BorderLayout.EAST)
@@ -446,7 +451,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun newSession() {
         abandonTurn()
-        cancelResume(); session = Session(); customTitle = null; resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
+        cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
         render(forceBottom = true)
         input.requestFocusInWindow()
     }
@@ -607,7 +612,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onThinking(delta: String) = ui(gen) { append(Kind.THINKING, delta) }
         override fun onToolUse(id: String, name: String, input: JsonObject) = ui(gen) {
             openKind = null
-            if (session.entries.none { it.toolId == id }) session.entries.add(Entry(Kind.TOOL, toolId = id, toolName = name, input = input))
+            if (session.entries.none { it.toolId == id }) session.entries.add(Entry(Kind.TOOL, toolId = id, toolName = name, input = input, model = activeModel))
             scheduleRender()
         }
         override fun onToolResult(id: String, text: String, isError: Boolean) = ui(gen) {
@@ -757,7 +762,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun append(kind: Kind, delta: String) {
         val last = session.entries.lastOrNull()
         if (openKind == kind && last != null && last.kind == kind) last.text += delta
-        else { session.entries.add(Entry(kind, delta)); openKind = kind }
+        else { session.entries.add(Entry(kind, delta, model = activeModel)); openKind = kind }
         scheduleRender()
     }
 
@@ -1012,7 +1017,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun updateExtras() {
         extrasRow.isVisible = extraFiles.isNotEmpty() || extraImages.isNotEmpty()
-        extrasLabel.text = "Joints : " + (extraFiles.map { it.first } + extraImages.map { it.first }).joinToString(", ") { it.substringAfterLast('/') }
+        // une vidéo apparaît une seule fois, avec son nombre d'images (« clip.mp4 ×6 »)
+        val names = extraImages.map { it.first }.groupingBy { it }.eachCount().map { (n, c) -> if (c > 1) "$n ×$c" else n }
+        extrasLabel.text = "Joints : " + (extraFiles.map { it.first.substringAfterLast('/') } + names).distinct().joinToString(", ")
         extrasRow.revalidate()
     }
 
@@ -1075,6 +1082,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         FileChooser.chooseFiles(FileChooserDescriptorFactory.createMultipleFilesNoJarsDescriptor(), project, null) { files ->
             for (vf in files) {
                 if (vf.isDirectory) continue
+                if (VideoTools.isVideo(vf.name)) { attachVideo(vf.path, relPath(vf), vf.name); continue }
                 val ext = vf.extension?.lowercase()
                 val media = mapOf("png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "gif" to "image/gif", "webp" to "image/webp")[ext]
                 if (media != null) {
@@ -1092,6 +1100,22 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             }
             updateExtras()
         }
+    }
+
+    /** Vidéo : quelques images extraites par ffmpeg, en arrière-plan (l'API n'accepte pas la vidéo). */
+    private fun attachVideo(path: String, rel: String, name: String) {
+        com.intellij.openapi.progress.ProgressManager.getInstance().run(object : com.intellij.openapi.progress.Task.Backgroundable(project, "Extraction des images de « $name »…", true) {
+            override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
+                val (text, frames) = VideoTools.attach(path, rel) { i, n -> indicator.fraction = i.toDouble() / n }
+                ApplicationManager.getApplication().invokeLater({
+                    extraFiles.add(rel to text)
+                    frames.forEach { extraImages.add(Triple(name, "image/jpeg", Base64.getEncoder().encodeToString(it))) }
+                    if (frames.isEmpty()) Notifier.warn(project, "$name : images non extraites (ffmpeg requis). Le chemin est transmis à Claude.")
+                    else Notifier.info(project, "$name : ${frames.size} image(s) extraite(s) et jointes.")
+                    updateExtras()
+                }, ModalityState.any())
+            }
+        })
     }
 
     /** Fichier ouvert, ou sélection s'il y en a une (FR-20). */
@@ -1259,6 +1283,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val bar = scroll.verticalScrollBar
         val atBottom = forceBottom || bar.value + bar.visibleAmount >= bar.maximum - 40
         val oldValue = bar.value
+        (transcriptCards.layout as java.awt.CardLayout).show(transcriptCards, if (session.entries.isEmpty()) "welcome" else "chat")
         titleLabel.text = customTitle ?: session.title
         content?.displayName = tabTitle()
         syncSend()
@@ -1288,6 +1313,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val link = JBUI.CurrentTheme.Link.Foreground.ENABLED
         val userBg = JBColor(Color(0xE8F0FE), Color(0x2D3748))
         val codeBg = JBColor(Color(0xF3F3F3), Color(0x2B2D30))
+        val you = JBColor(Color(0x2F6FDE), Color(0x6EA8FE))
         view.background = UIUtil.getEditorPaneBackground()
 
         val sb = StringBuilder()
@@ -1297,24 +1323,21 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         sb.append("code,pre{font-family:'$codeFont';font-size:${font.size - 1}pt;}")
         sb.append("a{color:${hex(link)};}")
         sb.append("</style></head><body>")
-        if (session.entries.isEmpty()) {
-            sb.append("<p><font color='gray'>Posez une question, ou sélectionnez du code puis ")
-            sb.append("clic droit &gt; « Envoyer la sélection à Claude Chat ».</font></p>")
-        }
         var lastRole = ""
         for (e in session.entries) {
             when (e.kind) {
                 Kind.USER -> {
                     lastRole = "user"
-                    sb.append("<table width='100%' cellpadding='6' cellspacing='0'><tr><td bgcolor='${hex(userBg)}'>")
-                    sb.append("<font color='gray' size='-1'><b>Vous</b>")
-                    e.attached?.let { sb.append(" — joint : ${esc(it)}") }
-                    e.note?.let { sb.append(" — ${esc(it)}") }
-                    sb.append("</font>").append(Md.toHtml(e.text)).append("</td></tr></table>")
+                    sb.append("<table cellpadding='0' cellspacing='0'><tr><td height='8'></td></tr></table>")
+                    sb.append("<table width='100%' cellpadding='0' cellspacing='0'><tr><td width='4' bgcolor='${hex(you)}'>&nbsp;</td><td bgcolor='${hex(userBg)}'>")
+                    sb.append("<table cellpadding='7' cellspacing='0'><tr><td>")
+                    sb.append(speakerLabel("Vous", hex(you), listOfNotNull(e.attached?.let { "joint : $it" }, e.note).joinToString(" · ")))
+                    sb.append("<br/>").append(Md.toHtml(e.text)).append("</td></tr></table></td></tr></table>")
                 }
                 else -> {
                     if (lastRole != "claude" && e.kind != Kind.NOTICE && e.kind != Kind.ERROR) {
-                        sb.append("<font color='gray' size='-1'><b>Claude</b></font>"); lastRole = "claude"
+                        sb.append(assistantHeader(hex(ACCENT), (e.model ?: activeModel)?.let { ModelCatalog.label(it) }, gap = lastRole != ""))
+                        lastRole = "claude"
                     }
                     when (e.kind) {
                         Kind.TEXT -> sb.append(linkify(Md.toHtml(e.text)))

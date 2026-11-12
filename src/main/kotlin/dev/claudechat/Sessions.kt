@@ -20,6 +20,8 @@ class Entry(
     val attached: String? = null,
     /** Mention affichée à côté de « Vous » (ex. précision envoyée en cours de réponse). */
     val note: String? = null,
+    /** Modèle ayant produit ce contenu (réponses de Claude). */
+    val model: String? = null,
 )
 
 /** Conversation en cours. L'identifiant est celui de la session de la CLI (RG-4). */
@@ -115,6 +117,7 @@ object SessionStore {
             for (l in lines) {
                 if (!l.startsWith("{")) continue
                 val o = runCatching { JsonParser.parseString(l).asJsonObject }.getOrNull() ?: continue
+                val mdl = o["message"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("model")?.takeIf { it.isJsonPrimitive }?.asString
                 when (o["type"]?.asString) {
                     "user" -> {
                         userText(o)?.let { s.entries.add(Entry(Kind.USER, it)) }
@@ -132,10 +135,10 @@ object SessionStore {
                     "assistant" -> o["message"]?.asJsonObject?.get("content")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { b ->
                         val bo = b.asJsonObject
                         when (bo["type"]?.asString) {
-                            "text" -> bo["text"].asString.takeIf { it.isNotBlank() }?.let { s.entries.add(Entry(Kind.TEXT, it)) }
-                            "thinking" -> bo["thinking"]?.asString?.takeIf { it.isNotBlank() }?.let { s.entries.add(Entry(Kind.THINKING, it)) }
+                            "text" -> bo["text"].asString.takeIf { it.isNotBlank() }?.let { s.entries.add(Entry(Kind.TEXT, it, model = mdl)) }
+                            "thinking" -> bo["thinking"]?.asString?.takeIf { it.isNotBlank() }?.let { s.entries.add(Entry(Kind.THINKING, it, model = mdl)) }
                             "tool_use" -> {
-                                val e = Entry(Kind.TOOL, toolId = bo["id"].asString, toolName = bo["name"].asString, input = bo["input"]?.asJsonObject)
+                                val e = Entry(Kind.TOOL, toolId = bo["id"].asString, toolName = bo["name"].asString, input = bo["input"]?.asJsonObject, model = mdl)
                                 tools[e.toolId!!] = e
                                 s.entries.add(e)
                             }

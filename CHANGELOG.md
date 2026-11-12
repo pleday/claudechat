@@ -1,10 +1,12 @@
 # Changelog
 
-## Non publié
+## 0.6.0
 
+- Écran d'accueil à chaque nouvel onglet : portrait (ressource `images/avatar.png`, remplaçable) et astuces qui tournent
+- Transcript plus lisible : « Vous » et « Claude » en gras et en couleur, barre d'accent, modèle affiché à côté de Claude
+- Pièces jointes **vidéo** (mp4, mov, webm, mkv, avi…) : images extraites avec ffmpeg et envoyées à Claude avec les instants (la piste audio n'est pas transmise)
 - Zone de saisie refondue : carte à bordure d'accent, « + », permissions, fichier courant (cliquable), modèle/effort, anneau de contexte, bouton d'envoi rond avec menu « Mettre en file d'attente / Préciser l'exécution en cours »
 - **Préciser** une réponse en cours : le message est injecté au prochain point d'arrêt de Claude, sans l'interrompre (Ctrl+Entrée ou menu du bouton)
-- Bouton d'envoi avec icône et menu déroulant **Empiler / Préciser** pendant une réponse
 - File d'attente visible : le dernier message empilé s'affiche, un clic ouvre le détail de tous (ordre, suppression, envoi immédiat en précision)
 
 ## 0.5.0 — première release

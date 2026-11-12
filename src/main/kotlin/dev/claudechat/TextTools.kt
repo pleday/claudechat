@@ -189,3 +189,16 @@ fun <T> MutableList<T>.moveItem(from: Int, to: Int): Int {
     add(dest, removeAt(from))
     return dest
 }
+
+private fun htmlEsc(t: String) = t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+/** Nom d'orateur lisible : en gras et en couleur, avec une précision discrète à côté. */
+fun speakerLabel(name: String, colorHex: String, subtitle: String? = null): String =
+    "<font color='$colorHex'><b>${htmlEsc(name)}</b></font>" +
+        (subtitle?.takeIf { it.isNotBlank() }?.let { " <font color='gray' size='-1'>${htmlEsc(it)}</font>" } ?: "")
+
+/** En-tête des réponses de Claude : barre verticale colorée puis nom (et modèle). */
+fun assistantHeader(colorHex: String, subtitle: String?, gap: Boolean): String =
+    (if (gap) "<table cellpadding='0' cellspacing='0'><tr><td height='10'></td></tr></table>" else "") +
+        "<table cellpadding='0' cellspacing='0'><tr><td width='4' bgcolor='$colorHex'>&nbsp;</td><td>&nbsp;&nbsp;" +
+        speakerLabel("Claude", colorHex, subtitle) + "</td></tr></table>"
