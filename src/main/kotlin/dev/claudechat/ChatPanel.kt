@@ -584,7 +584,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             session.id, settings.state.system, emptyList(), fork,
         )
         ApplicationManager.getApplication().executeOnPooledThread {
-            val mcp = settings.activeMcp()
+            val mcp = emptyList<McpEntry>()
             val t = CliTurn(TurnOptions(opts.cli, opts.cwd, opts.model, opts.effort, opts.permissionMode, opts.sessionId, opts.appendSystem, mcp, fork), content, listener(gen))
             ApplicationManager.getApplication().invokeLater({ if (gen == generation) turn = t else t.kill() }, ModalityState.any())
             t.start()
@@ -1134,34 +1134,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         return rel to "<file path=\"$rel\">\n$text\n</file>"
     }
 
-    private fun showMcpPopup() {
-        val servers = settings.mcpServers()
-        val group = DefaultActionGroup()
-        if (servers.isEmpty()) group.add(action("Aucun serveur supplémentaire — en ajouter…", AllIcons.General.Add) { openSettings() })
-        servers.forEach { srv ->
-            group.add(object : ToggleAction(srv.name.ifBlank { srv.url }) {
-                override fun getActionUpdateThread() = ActionUpdateThread.EDT
-                override fun isSelected(e: AnActionEvent) = srv.enabled
-                override fun setSelected(e: AnActionEvent, state: Boolean) {
-                    srv.enabled = state
-                    settings.saveMcpServers(servers)
-                    updateUsage()
-                }
-            })
-        }
-        group.addSeparator()
-        group.add(action("Gérer les serveurs MCP…", AllIcons.General.GearPlain) { openSettings() })
-        JBPopupFactory.getInstance()
-            .createActionGroupPopup("Serveurs MCP", group, DataManager.getInstance().getDataContext(this),
-                JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, true)
-            .showInCenterOf(this)
-    }
+    private fun showMcpPopup() { McpDialog(project, cwd).show() }
 
     private fun fmt(n: Int) = if (n >= 1000) "%.1fk".format(n / 1000.0) else "$n"
 
     private fun updateUsage() {
         val parts = mutableListOf<String>()
-        settings.mcpActiveCount().takeIf { it > 0 }?.let { parts.add("MCP $it") }
         if (remoteOn) parts.add("📱")
         if (usageIn + usageOut > 0) parts.add("↑${fmt(usageIn)} ↓${fmt(usageOut)}")
         if (costUsd > 0) parts.add("%.2f $".format(costUsd))

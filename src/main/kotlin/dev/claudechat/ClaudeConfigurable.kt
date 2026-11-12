@@ -34,7 +34,6 @@ val PERMISSION_HELP = mapOf(
 val EFFORTS = listOf("auto", "low", "medium", "high", "xhigh", "max")
 
 class ClaudeConfigurable : BoundConfigurable("Claude Chat") {
-    private val mcpTable = McpTablePanel()
 
     override fun apply() {
         super.apply()
@@ -122,15 +121,13 @@ class ClaudeConfigurable : BoundConfigurable("Claude Chat") {
                 button("Oublier le téléphone") { s.state.telegramChatId = ""; lbl.text = "aucun"; ApplicationManager.getApplication().executeOnPooledThread { RemoteBridge.reconfigure() } }
             }
         }
-        group("Serveurs MCP supplémentaires (HTTP)") {
+        group("Serveurs MCP") {
             row {
-                comment("Ajoutés à ceux déjà configurés dans la CLI (`claude mcp list`). Jeton transmis en en-tête Authorization: Bearer.")
-            }
-            row {
-                cell(mcpTable.component).align(Align.FILL)
-                    .onReset { mcpTable.load(s) }
-                    .onIsModified { mcpTable.isModified() }
-                    .onApply { mcpTable.save(s) }
+                button("Gérer les serveurs MCP…") {
+                    val project = com.intellij.openapi.project.ProjectManager.getInstance().openProjects.firstOrNull()
+                    McpDialog(project, project?.basePath ?: System.getProperty("user.home")).show()
+                }
+                comment("Liste, ajoute et supprime les serveurs de la CLI (portées utilisateur, projet, local).")
             }
         }
     }

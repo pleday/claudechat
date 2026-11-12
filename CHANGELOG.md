@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+
+- **Serveurs MCP** : nouvelle fenêtre (liste groupée par portée Utilisateur / Projet / Local / claude.ai, badges de statut « Connecté », « Authentification requise », « Échec », détails dépliables avec secrets masqués, recherche, actualisation) et fenêtre « Ajouter un serveur MCP » (nom facultatif, portée, configuration JSON `mcpServers` ou d'un seul serveur). S'appuie sur `claude mcp list / add-json / remove` ; remplace l'ancien tableau des réglages
+
 ## 0.6.0
 
 - Écran d'accueil à chaque nouvel onglet : portrait (ressource `images/avatar.png`, remplaçable) et astuces qui tournent
