@@ -1,0 +1,32 @@
+<idea-plugin>
+    <id>dev.claudechat</id>
+    <name>Claude Chat</name>
+    <vendor>Personal</vendor>
+    <description>Interface graphique pour Claude Code (CLI claude) : conversation en streaming, cartes d&apos;outils, approbation des actions, diff modifiable, sessions reprenables, MCP, message de commit.</description>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.vcs</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="Claude Chat" displayType="BALLOON"/>
+        <toolWindow id="Claude Chat" anchor="right" icon="/icons/claude.svg"
+                    factoryClass="dev.claudechat.ChatToolWindowFactory"/>
+        <applicationConfigurable parentId="tools" id="dev.claudechat.settings"
+                                 displayName="Claude Chat"
+                                 instance="dev.claudechat.ClaudeConfigurable"/>
+    </extensions>
+
+    <actions>
+        <action id="ClaudeChat.SendSelection" class="dev.claudechat.SendSelectionAction"
+                text="Envoyer la sélection à Claude Chat">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift C"/>
+        </action>
+        <group id="ClaudeChat.EditorMenu" class="dev.claudechat.ClaudeActionsGroup"
+               popup="true" text="Claude Chat">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </group>
+        <action id="ClaudeChat.CommitMessage" class="dev.claudechat.GenerateCommitMessageAction"
+                text="Générer le message de commit avec Claude">
+            <add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
+        </action>
+    </actions>
+</idea-plugin>
