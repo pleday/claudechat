@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.6.0/claude-chat-0.6.0.zip" version="0.6.0">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.7.0/claude-chat-0.7.0.zip" version="0.7.0">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li>Écran d'accueil à chaque nouvel onglet : portrait (ressource <code>images/avatar.png</code>, remplaçable) et astuces qui tournent</li>
-<li>Transcript plus lisible : « Vous » et « Claude » en gras et en couleur, barre d'accent, modèle affiché à côté de Claude</li>
-<li>Pièces jointes <b>vidéo</b> (mp4, mov, webm, mkv, avi…) : images extraites avec ffmpeg et envoyées à Claude avec les instants (la piste audio n'est pas transmise)</li>
-<li>Zone de saisie refondue : carte à bordure d'accent, « + », permissions, fichier courant (cliquable), modèle/effort, anneau de contexte, bouton d'envoi rond avec menu « Mettre en file d'attente / Préciser l'exécution en cours »</li>
-<li><b>Préciser</b> une réponse en cours : le message est injecté au prochain point d'arrêt de Claude, sans l'interrompre (Ctrl+Entrée ou menu du bouton)</li>
-<li>File d'attente visible : le dernier message empilé s'affiche, un clic ouvre le détail de tous (ordre, suppression, envoi immédiat en précision)</li>
+<li><b>Ouverture du panneau plus rapide</b> : les actions de la barre d'outils et des menus se rafraîchissent hors du thread d'interface (<code>ActionUpdateThread.BGT</code>) (l'IDE signalait jusqu'à plusieurs secondes d'attente de ce thread au démarrage)</li>
+<li>Dépôt de mises à jour du plugin (<code>updatePlugins.xml</code>) pour que l'IDE identifie l'origine du plugin ; <code>make repo</code> le régénère</li>
+<li>Construction du plugin indépendante d'un second IDE (index de recherche des réglages désactivé), même quand <code>make run</code> est ouvert</li>
+<li><b>Serveurs MCP</b> : nouvelle fenêtre (liste groupée par portée Utilisateur / Projet / Local / claude.ai, badges de statut « Connecté », « Authentification requise », « Échec », détails dépliables avec secrets masqués, recherche, actualisation) et fenêtre « Ajouter un serveur MCP » (nom facultatif, portée, configuration JSON <code>mcpServers</code> ou d'un seul serveur). S'appuie sur <code>claude mcp list / add-json / remove</code> ; remplace l'ancien tableau des réglages</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
