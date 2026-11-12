@@ -34,6 +34,8 @@ fun parseRateLimits(j: JsonObject): RateLimits? {
     return r.takeIf { it.fiveHour != null || it.sevenDay != null || it.status == "rejected" }
 }
 
+data class ProbeResult(val limits: RateLimits?, val error: String?)
+
 data class McpEntry(val name: String, val url: String, val token: String?)
 
 class PermissionRequest(
@@ -223,6 +225,30 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                 }
             })
         }.toString()
+
+        /**
+         * Mesure les quotas sans conversation : une requête minimale (Haiku, sans session ni outil) dont on lit
+         * l'événement `rate_limit_event`. Coût : quelques millièmes de dollar. Bloquant.
+         */
+        fun probeQuota(cli: String, cwd: String, timeoutSec: Long = 60): ProbeResult = try {
+            val cmd = listOf(cli, "-p", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
+                "--permission-mode", "dontAsk", "--permission-prompts", "none", "--model", "claude-haiku-5-5")
+            val p = ProcessBuilder(cmd).directory(java.io.File(cwd)).start()
+            p.outputStream.bufferedWriter().use { it.write("ok") }
+            val err = StringBuffer()
+            Thread { p.errorStream.bufferedReader().forEachLine { err.append(it).append('\n') } }.apply { isDaemon = true }.start()
+            var limits: RateLimits? = null
+            val reader = Thread {
+                p.inputStream.bufferedReader().forEachLine { line ->
+                    if (line.startsWith("{") && line.contains("rate_limit_event"))
+                        runCatching { parseRateLimits(JsonParser.parseString(line).asJsonObject) }.getOrNull()?.let { limits = it }
+                }
+            }.apply { isDaemon = true; start() }
+            reader.join(timeoutSec * 1000)
+            if (reader.isAlive) { p.destroy(); ProbeResult(limits, "délai dépassé") }
+            else limits?.let { ProbeResult(it, null) }
+                ?: ProbeResult(null, err.toString().trim().ifEmpty { "la CLI n'a fourni aucune information de quota (compte API, proxy ou version sans cette donnée ?)" })
+        } catch (e: Exception) { ProbeResult(null, "impossible de lancer la CLI : ${e.message}") }
 
         /** Question ponctuelle sans session ni outil (message de commit). Bloquant. */
         fun oneShot(cli: String, cwd: String, model: String, prompt: String, cancelled: () -> Boolean): String {

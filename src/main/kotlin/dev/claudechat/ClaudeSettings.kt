@@ -51,8 +51,7 @@ class ClaudeSettings : PersistentStateComponent<ClaudeSettings.State> {
     /** Exécutable `claude` : réglage, sinon ~/.local/bin/claude, sinon le PATH. */
     fun cliPath(): String {
         current.cliPath.takeIf { it.isNotBlank() }?.let { return it }
-        val local = java.io.File(System.getProperty("user.home"), ".local/bin/claude")
-        return if (local.canExecute()) local.path else "claude"
+        return defaultCli()
     }
 
     /** Catalogue de modèles : valeurs par défaut + modèles personnalisés (FR-62). */
@@ -98,6 +97,12 @@ class ClaudeSettings : PersistentStateComponent<ClaudeSettings.State> {
     private fun tokenAttrs(id: String) = CredentialAttributes(generateServiceName("ClaudeChat", "mcp:$id"))
 
     companion object {
+        /** ~/.local/bin/claude s'il existe, sinon `claude` du PATH. */
+        fun defaultCli(): String {
+            val local = java.io.File(System.getProperty("user.home"), ".local/bin/claude")
+            return if (local.canExecute()) local.path else "claude"
+        }
+
             fun get(): ClaudeSettings = service()
     }
 }

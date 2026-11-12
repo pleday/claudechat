@@ -93,6 +93,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var lastLimits: RateLimits? = null
     private var resumeAt = 0L
     private var resumeAttempts = 0
+    private var quotaError: String? = null
+    private var popupRef: com.intellij.openapi.ui.popup.JBPopup? = null
+    private var noQuotaLastTurn = false
     private var searchQuery = ""
     private var costUsd = 0.0
     private var openKind: Kind? = null
@@ -312,6 +315,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         updateUsage()
         updateQuota(); updateStatus()
         if (remoteOn) RemoteBridge.register(phoneSink)
+        if (System.currentTimeMillis() - settings.state.rlAt > 30 * 60_000L) probeQuota()
         ApplicationManager.getApplication().executeOnPooledThread { RemoteBridge.ensureStarted() }
     }
 
@@ -459,13 +463,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun listener(gen: Int) = object : TurnListener {
         override fun onInit(sessionId: String, model: String?) = ui(gen) { session.id = sessionId; activeModel = model ?: activeModel; updateStatus() }
         override fun onLiveUsage(contextTokens: Int, outputTokens: Int) = ui(gen) { liveCtx = contextTokens; liveOut = outputTokens; updateStatus() }
-        override fun onRateLimits(limits: RateLimits) = ui(gen) {
-            lastLimits = limits
-            limits.fiveHour?.let { settings.state.rlFiveUtil = it.utilization; settings.state.rlFiveReset = it.resetsAt }
-            limits.sevenDay?.let { settings.state.rlWeekUtil = it.utilization; settings.state.rlWeekReset = it.resetsAt }
-            settings.state.rlAt = System.currentTimeMillis()
-            updateQuota()
-        }
+        override fun onRateLimits(limits: RateLimits) = ui(gen) { lastLimits = limits; applyLimits(limits) }
         override fun onText(delta: String) = ui(gen) { append(Kind.TEXT, delta) }
         override fun onThinking(delta: String) = ui(gen) { append(Kind.THINKING, delta) }
         override fun onToolUse(id: String, name: String, input: JsonObject) = ui(gen) {
@@ -535,6 +533,28 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         statusLabel.toolTipText = activeModel?.let { "Modèle utilisé : $it" }
     }
 
+    private fun applyLimits(limits: RateLimits) {
+        limits.fiveHour?.let { settings.state.rlFiveUtil = it.utilization; settings.state.rlFiveReset = it.resetsAt }
+        limits.sevenDay?.let { settings.state.rlWeekUtil = it.utilization; settings.state.rlWeekReset = it.resetsAt }
+        settings.state.rlAt = System.currentTimeMillis()
+        quotaError = null
+        updateQuota()
+    }
+
+    /** Mesure les quotas hors conversation (au démarrage, ou via « Actualiser »). */
+    private fun probeQuota(onDone: () -> Unit = {}) {
+        if (!QuotaProbeGate.tryStart()) return
+        quotaError = null
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val r = CliTurn.probeQuota(settings.cliPath(), cwd)
+            QuotaProbeGate.finish()
+            ApplicationManager.getApplication().invokeLater({
+                r.limits?.let { applyLimits(it) } ?: run { quotaError = r.error; LOG.warn("Mesure des quotas impossible : ${r.error}") }
+                updateQuota(); onDone()
+            }, ModalityState.any())
+        }
+    }
+
     private fun fiveHourWindow() = settings.state.takeIf { it.rlFiveUtil >= 0 }?.let { QuotaWindow(it.rlFiveUtil, it.rlFiveReset) }
     private fun weekWindow() = settings.state.takeIf { it.rlWeekUtil >= 0 }?.let { QuotaWindow(it.rlWeekUtil, it.rlWeekReset) }
 
@@ -572,14 +592,20 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             "Contexte : ${fmt(liveCtx)} tokens<br/>" +
             "Tokens cumulés : ↑ ${fmt(usageIn)} entrée · ↓ ${fmt(usageOut)} sortie<br/>" +
             (if (costUsd > 0) "Coût estimé : %.2f $<br/>".format(costUsd) else "") +
-            "<br/><font color='gray'>$measured. Les quotas sont fournis par la CLI et se mettent à jour après chaque réponse.</font></body></html>"
+            (quotaError?.let { "<br/><font color='red'>Mesure impossible : ${StringUtil.escapeXmlEntities(it)}</font>" } ?: "") +
+            (if (noQuotaLastTurn) "<br/><font color='red'>La CLI n'a envoyé aucun quota pendant la dernière réponse.</font>" else "") +
+            "<br/><font color='gray'>$measured. Les quotas sont fournis par la CLI après chaque réponse.</font></body></html>"
         val panel = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(10)
             add(JBLabel(html), BorderLayout.CENTER)
+            add(JButton("Actualiser").apply {
+                toolTipText = "Mesure les quotas maintenant (requête minimale, quelques millièmes de dollar)"
+                addActionListener { isEnabled = false; text = "Mesure…"; probeQuota { popupRef?.cancel(); showUsageDetails() } }
+            }, BorderLayout.SOUTH)
         }
-        JBPopupFactory.getInstance().createComponentPopupBuilder(panel, null)
+        popupRef = JBPopupFactory.getInstance().createComponentPopupBuilder(panel, null)
             .setTitle("Utilisation de Claude").setRequestFocus(true).setResizable(false).setMovable(true).setCancelOnClickOutside(true)
-            .createPopup().showUnderneathOf(batteryLabel)
+            .createPopup().also { it.showUnderneathOf(batteryLabel) }
     }
 
     private fun append(kind: Kind, delta: String) {
@@ -596,6 +622,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val until = if (isError && !interrupted && autoResumeOn && resumeAttempts < MAX_RESUMES)
             QuotaGuard.blockedUntil(lastLimits, message, System.currentTimeMillis() / 1000, settings.state.autoResumeDelayMin * 60L) else null
         if (!isError) resumeAttempts = 0
+        noQuotaLastTurn = !isError && !interrupted && lastLimits == null
+        if (noQuotaLastTurn) LOG.info("Aucun rate_limit_event reçu pendant cette réponse")
         if (isError) {
             if (interrupted) session.entries.add(Entry(Kind.NOTICE, "Réponse interrompue."))
             else if (until != null) session.entries.add(Entry(Kind.NOTICE, "Quota atteint : la conversation reprendra automatiquement ${settings.state.autoResumeDelayMin} min après le début de la prochaine session."))
@@ -1130,6 +1158,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     companion object {
         const val MAX_RESUMES = 6
+        private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ChatPanel::class.java)
         val EDIT_TOOLS = setOf("Edit", "Write", "MultiEdit")
         val WRITE_TOOLS = setOf("Edit", "Write", "MultiEdit", "NotebookEdit", "Bash")
     }

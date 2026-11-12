@@ -167,3 +167,10 @@ fun chunkText(text: String, max: Int = 3800): List<String> {
     if (rest.isNotEmpty()) out += rest
     return out
 }
+
+/** Évite plusieurs mesures de quota simultanées (un onglet = un panneau). */
+object QuotaProbeGate {
+    private val running = java.util.concurrent.atomic.AtomicBoolean(false)
+    fun tryStart() = running.compareAndSet(false, true)
+    fun finish() = running.set(false)
+}

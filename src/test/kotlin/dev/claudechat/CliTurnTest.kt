@@ -186,3 +186,38 @@ echo '{"type":"result","is_error":false}'
         assertEquals(0.42, limits!!.fiveHour!!.utilization, 1e-9)
     }
 }
+
+class ProbeQuotaTest {
+    @TempDir lateinit var tmp: Path
+
+    private fun fake(body: String): String {
+        org.junit.jupiter.api.Assumptions.assumeTrue(!System.getProperty("os.name").lowercase().contains("win"))
+        val f = tmp.resolve("claude"); Files.writeString(f, "#!/bin/bash\n$body\n"); f.toFile().setExecutable(true); return f.toString()
+    }
+
+    @Test fun readsRateLimitsFromProbe() {
+        val args = tmp.resolve("args.txt")
+        val cli = fake("""echo "${'$'}@" > $args; cat >/dev/null
+echo '{"type":"system","subtype":"init"}'
+echo '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","unifiedWindows":{"five_hour":{"utilization":0.2,"resetsAt":99}}}}'
+echo '{"type":"result","is_error":false}'""")
+        val r = CliTurn.probeQuota(cli, tmp.toString())
+        assertNull(r.error)
+        assertEquals(0.2, r.limits!!.fiveHour!!.utilization, 1e-9)
+        assertTrue("--no-session-persistence" in Files.readString(args) && "claude-haiku-5-5" in Files.readString(args))
+    }
+
+    @Test fun explainsWhenNoQuotaIsProvided() {
+        val cli = fake("""cat >/dev/null; echo '{"type":"result","is_error":false}'""")
+        val r = CliTurn.probeQuota(cli, tmp.toString())
+        assertNull(r.limits)
+        assertTrue("aucune information de quota" in r.error!!)
+    }
+
+    @Test fun reportsStderrOnFailure() {
+        val cli = fake("""cat >/dev/null; echo 'Not logged in' >&2; exit 1""")
+        assertEquals("Not logged in", CliTurn.probeQuota(cli, tmp.toString()).error)
+    }
+
+    @Test fun reportsMissingCli() = assertTrue(CliTurn.probeQuota("/nonexistent/claude", tmp.toString()).error!!.startsWith("impossible de lancer"))
+}
