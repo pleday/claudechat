@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "dev.claudechat"
-version = "0.6.0"
+version = "0.7.0"
 
 repositories {
     mavenCentral()
@@ -31,6 +31,9 @@ tasks.test {
 kotlin { jvmToolchain(21) }
 
 intellijPlatform {
+    // Évite de lancer un second IDE pendant la construction (impossible si `make run` est ouvert) ;
+    // seul l'index de la recherche des réglages en dépend.
+    buildSearchableOptions = false
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "243"

@@ -1,7 +1,10 @@
 # Changelog
 
-## Non publié
+## 0.7.0
 
+- **Ouverture du panneau plus rapide** : les actions de la barre d'outils et des menus se rafraîchissent hors du thread d'interface (`ActionUpdateThread.BGT`) (l'IDE signalait jusqu'à plusieurs secondes d'attente de ce thread au démarrage)
+- Dépôt de mises à jour du plugin (`updatePlugins.xml`) pour que l'IDE identifie l'origine du plugin ; `make repo` le régénère
+- Construction du plugin indépendante d'un second IDE (index de recherche des réglages désactivé), même quand `make run` est ouvert
 - **Serveurs MCP** : nouvelle fenêtre (liste groupée par portée Utilisateur / Projet / Local / claude.ai, badges de statut « Connecté », « Authentification requise », « Échec », détails dépliables avec secrets masqués, recherche, actualisation) et fenêtre « Ajouter un serveur MCP » (nom facultatif, portée, configuration JSON `mcpServers` ou d'un seul serveur). S'appuie sur `claude mcp list / add-json / remove` ; remplace l'ancien tableau des réglages
 
 ## 0.6.0
