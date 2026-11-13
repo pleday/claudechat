@@ -215,4 +215,11 @@ class QueueToolsTest {
         assertEquals("2 h", formatDuration(7_200_000))
         assertEquals("moins d'une seconde", formatDuration(-5))
     }
+
+    @Test fun busyWarningOnlyWhenSomethingIsRunning() {
+        assertNull(busyWarning(false, 3, "x"))
+        assertEquals("Claude est en train de répondre. Fermer.", busyWarning(true, 0, "Fermer."))
+        assertTrue("1 message en attente sera perdu" in busyWarning(true, 1, "Fermer.")!!)
+        assertTrue("2 messages en attente seront perdus" in busyWarning(true, 2, "Fermer.")!!)
+    }
 }

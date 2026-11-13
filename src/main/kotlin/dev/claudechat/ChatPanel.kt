@@ -495,7 +495,17 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun toggle(text: String, icon: Icon, get: () -> Boolean, set: (Boolean) -> Unit) = panelToggle(text, icon, get, set)
 
+    /**
+     * Demande confirmation si Claude répond encore : [consequence] décrit ce qui sera interrompu. Renvoie true s'il
+     * n'y a rien d'en cours ou si l'utilisateur confirme. Utilisé aussi à la fermeture de l'onglet (voir la fenêtre d'outils).
+     */
+    fun confirmDiscard(consequence: String, yes: String): Boolean {
+        val msg = busyWarning(streaming, queue.size, consequence) ?: return true
+        return Messages.showYesNoDialog(project, msg, "Réponse en cours", yes, "Annuler", Messages.getWarningIcon()) == Messages.YES
+    }
+
     private fun newSession() {
+        if (!confirmDiscard("Démarrer une nouvelle conversation interrompt la réponse en cours (la conversation actuelle reste dans l'historique des sessions).", "Interrompre et recommencer")) return
         abandonTurn()
         cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
         render(forceBottom = true)
@@ -503,6 +513,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     fun loadSession(s: Session) {
+        if (!confirmDiscard("Charger une autre session interrompt la réponse en cours.", "Interrompre et charger")) return
         abandonTurn()
         cancelResume(); session = s; customTitle = null; allowAll = false; applyRemote(settings.state.remoteDefault)
         resetUsage()

@@ -238,3 +238,13 @@ fun formatDuration(ms: Long): String {
         else -> "$sec s"
     }
 }
+
+/**
+ * Avertissement avant une action qui interrompt la réponse en cours (fermer l'onglet, nouvelle conversation…) ;
+ * null si rien n'est en cours, donc aucune confirmation à demander.
+ */
+fun busyWarning(streaming: Boolean, queued: Int, consequence: String): String? {
+    if (!streaming) return null
+    val lost = when (queued) { 0 -> ""; 1 -> "\n\n1 message en attente sera perdu."; else -> "\n\n$queued messages en attente seront perdus." }
+    return "Claude est en train de répondre. $consequence$lost"
+}

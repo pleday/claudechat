@@ -20,6 +20,12 @@ class ChatToolWindowFactory : ToolWindowFactory, DumbAware {
         addTab(project, toolWindow)
         // Fermer le dernier onglet en recrée un vierge, pour que la fenêtre ne reste jamais vide.
         toolWindow.contentManager.addContentManagerListener(object : com.intellij.ui.content.ContentManagerListener {
+            /** Fermer un onglet pendant que Claude répond interromprait la réponse : on demande confirmation. */
+            override fun contentRemoveQuery(event: com.intellij.ui.content.ContentManagerEvent) {
+                val panel = event.content.component as? ChatPanel ?: return
+                if (!panel.confirmDiscard("Fermer l'onglet interrompt la réponse en cours.", "Fermer l'onglet")) event.consume()
+            }
+
             override fun contentRemoved(event: com.intellij.ui.content.ContentManagerEvent) {
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
                     if (!toolWindow.isDisposed && toolWindow.contentManager.contentCount == 0) addTab(project, toolWindow)
