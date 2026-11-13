@@ -159,7 +159,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun getPreferredSize() = java.awt.Dimension(0, super.getPreferredSize().height)
     }.apply {
         font = JBUI.Fonts.smallFont()
-        foreground = UIUtil.getContextHelpForeground()
         iconTextGap = JBUI.scale(4)
         border = JBUI.Borders.empty(2, 6)
         cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
@@ -177,7 +176,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private val stickyScroll = JBScrollPane(stickyText).apply { border = JBUI.Borders.empty(); isOpaque = false; viewport.isOpaque = false; isVisible = false }
     private val stickyBar = JPanel(BorderLayout()).apply {
         isVisible = false
-        border = JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0)
+        // même bleu que le message « Vous » de la conversation : liseré à gauche et fond teinté
+        isOpaque = true
+        background = USER_BG
+        border = JBUI.Borders.compound(JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0), JBUI.Borders.customLine(USER_ACCENT, 0, 4, 0, 0))
         add(stickyLabel, BorderLayout.NORTH)
         add(stickyScroll, BorderLayout.CENTER)
     }
@@ -1780,12 +1782,16 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         return TranscriptRenderer.Theme(
             font.family, font.size, EditorColorsManager.getInstance().globalScheme.editorFontName,
             UIUtil.getLabelForeground(), JBUI.CurrentTheme.Link.Foreground.ENABLED,
-            JBColor(Color(0xE8F0FE), Color(0x2D3748)), JBColor(Color(0xF3F3F3), Color(0x2B2D30)),
-            JBColor(Color(0x2F6FDE), Color(0x6EA8FE)), ACCENT,
+            USER_BG, JBColor(Color(0xF3F3F3), Color(0x2B2D30)),
+            USER_ACCENT, ACCENT,
         )
     }
 
     companion object {
+        /** Couleurs des messages de l'utilisateur : la conversation et le message épinglé en haut doivent rester identiques. */
+        val USER_BG = JBColor(Color(0xE8F0FE), Color(0x2D3748))
+        val USER_ACCENT = JBColor(Color(0x2F6FDE), Color(0x6EA8FE))
+
         const val MAX_RESUMES = 6
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ChatPanel::class.java)
         val EDIT_TOOLS = setOf("Edit", "Write", "MultiEdit")
