@@ -461,6 +461,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         if (System.currentTimeMillis() - settings.state.rlAt > 30 * 60_000L) probeQuota()
         ApplicationManager.getApplication().executeOnPooledThread { RemoteBridge.ensureStarted() }
         loadProjectFiles()
+        installPasteInterceptor(parent)
         // commandes slash de la CLI, chargées dès l'ouverture pour être proposées dès la première saisie
         ApplicationManager.getApplication().executeOnPooledThread {
             val list = CliTurn.listCommands(settings.cliPath(), cwd)
@@ -1248,6 +1249,25 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     // ---------- Collage d'images, mentions @, recherche ----------
 
     private var pasteCount = 0
+
+    /**
+     * Intercepte Ctrl+V / Maj+Inser tant que le champ de saisie a le focus : l'IDE traite ces raccourcis avant le composant
+     * (le collage d'une image ne passait ni par paste() ni par le TransferHandler). Journalise la touche et le focus.
+     */
+    private fun installPasteInterceptor(parent: Disposable) {
+        com.intellij.ide.IdeEventQueue.getInstance().addDispatcher({ e ->
+            if (e is java.awt.event.KeyEvent && e.id == java.awt.event.KeyEvent.KEY_PRESSED) {
+                val ctrlV = e.keyCode == java.awt.event.KeyEvent.VK_V && (e.isControlDown || e.isMetaDown) && !e.isAltDown
+                val shiftIns = e.keyCode == java.awt.event.KeyEvent.VK_INSERT && e.isShiftDown
+                if (ctrlV || shiftIns) {
+                    val owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
+                    LOG.info("Collage : touche de collage vue, focus = ${owner?.javaClass?.name}, dans le champ = ${owner === input}")
+                    if (owner === input && pasteFromClipboard(null, "IdeEventQueue")) { e.consume(); return@addDispatcher true }
+                }
+            }
+            false
+        }, parent)
+    }
 
     /**
      * FR-12 : colle une image ou des fichiers copiés comme pièces jointes. Renvoie false si le presse-papiers contient
