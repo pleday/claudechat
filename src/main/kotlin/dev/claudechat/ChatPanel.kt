@@ -129,6 +129,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private val queue = mutableListOf<String>()
 
     private var codeTexts: List<String> = emptyList()
+    // Déclarés avant le bloc init (qui appelle render()) : un champ déclaré plus bas serait encore null à ce moment
+    private val renderer = TranscriptRenderer { cwd }
+    private var lastHtml = ""
     private var copyPayload: String? = null
 
     private val view = JEditorPane().apply {
@@ -1596,8 +1599,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         alarm.addRequest({ renderPending = false; render() }, 80)
     }
 
-    private var lastHtml = ""
-
     private fun render(forceBottom: Boolean = false) {
         val bar = scroll.verticalScrollBar
         val atBottom = forceBottom || bar.value + bar.visibleAmount >= bar.maximum - 40
@@ -1627,8 +1628,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     private fun esc(s: String) = StringUtil.escapeXmlEntities(s)
-
-    private val renderer = TranscriptRenderer { cwd }
 
     private fun theme(): TranscriptRenderer.Theme {
         val font = UIUtil.getLabelFont()
