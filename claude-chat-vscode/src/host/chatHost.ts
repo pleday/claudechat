@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { ChangedFile } from '../core/changes';
+import { LIMITS } from '../core/constants';
 import type { RemoteBridge } from '../core/remote';
 import type { HostMsg, WebMsg } from '../protocol';
 import { ChatSession, type SessionEnv } from './chatSession';
@@ -54,7 +55,7 @@ export function currentEditor(): vscode.TextEditor | undefined {
   return lastEditor && vscode.window.visibleTextEditors.includes(lastEditor) && lastEditor.document.uri.scheme === 'file' ? lastEditor : undefined;
 }
 
-const MAX_ATTACH_CHARS = 120_000;
+const MAX_ATTACH_CHARS = LIMITS.maxAttachChars;
 
 /** Une conversation reliée à une webview (vue latérale ou onglet). */
 export class ChatHost {

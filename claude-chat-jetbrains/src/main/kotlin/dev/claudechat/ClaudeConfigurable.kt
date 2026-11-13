@@ -13,25 +13,11 @@ import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.rows
 
-val PERMISSION_MODES = listOf(
-    "manual" to "Demander",
-    "acceptEdits" to "Modifs auto",
-    "plan" to "Plan",
-    "auto" to "Auto",
-    "dontAsk" to "Sans demande",
-    "bypassPermissions" to "Tout autoriser",
-)
+val PERMISSION_MODES = Constants.permissionModes
 
 /** Explication de chaque mode de permission (infobulle). */
-val PERMISSION_HELP = mapOf(
-    "Demander" to "Claude demande ton accord avant chaque action sensible",
-    "Modifs auto" to "Les modifications de fichiers sont acceptées sans demander ; le reste est demandé",
-    "Plan" to "Claude propose un plan à valider avant d'agir",
-    "Auto" to "Mode automatique de la CLI",
-    "Sans demande" to "Tout ce qui demanderait une autorisation est refusé automatiquement",
-    "Tout autoriser" to "Aucune demande : Claude agit librement (à réserver aux environnements sûrs)",
-)
-val EFFORTS = listOf("auto", "low", "medium", "high", "xhigh", "max")
+val PERMISSION_HELP = Constants.permissionHelp
+val EFFORTS = Constants.efforts
 
 class ClaudeConfigurable : BoundConfigurable("Claude Chat") {
 

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { ChangedFile } from '../core/changes';
+import { DEFAULT_MODEL } from '../core/constants';
 import { RemoteBridge } from '../core/remote';
 import { loadSession } from '../core/sessions';
 import { SLASH_PROMPTS } from '../core/textTools';
@@ -116,7 +117,7 @@ export function activate(context: vscode.ExtensionContext): TestApi {
   reg('claudeChat.openChange', (f: ChangedFile) => changes.openOne(f));
   reg('claudeChat.forgetChanges', () => active?.session.clearChangedFiles());
   reg('claudeChat.commitMessage', (scm?: { rootUri?: vscode.Uri }) =>
-    generateCommitMessage(cliPath(), vscode.workspace.getConfiguration('claudeChat').get<string>('model', 'claude-sonnet-5-5'), scm));
+    generateCommitMessage(cliPath(), vscode.workspace.getConfiguration('claudeChat').get<string>('model', DEFAULT_MODEL), scm));
 
   const selection = () => {
     const ed = vscode.window.activeTextEditor ?? currentEditor();

@@ -59,7 +59,7 @@ class GenerateCommitMessageAction : DumbAwareAction(
     private fun buildDiff(changes: Collection<VcsChange>, indicator: ProgressIndicator): String {
         val sb = StringBuilder()
         for (c in changes) {
-            if (sb.length > 60_000) { sb.append("\n[... diff tronqué ...]"); break }
+            if (sb.length > Constants.commitDiffMaxChars) { sb.append("\n[... diff tronqué ...]"); break }
             val path = (c.afterRevision ?: c.beforeRevision)?.file?.path ?: continue
             val before = runCatching { c.beforeRevision?.content }.getOrNull()
             val after = runCatching { c.afterRevision?.content }.getOrNull()
@@ -85,8 +85,6 @@ class GenerateCommitMessageAction : DumbAwareAction(
     }
 
     companion object {
-        const val PROMPT = "Rédige le message de commit pour les changements ci-dessous, au format Conventional Commits : " +
-            "un titre de 72 caractères maximum, une ligne vide, puis un corps concis (puces) seulement si c'est utile. " +
-            "Réponds uniquement avec le message, sans bloc de code ni commentaire.\n\n"
+        val PROMPT: String = Constants.commitPrompt
     }
 }

@@ -506,13 +506,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var usageIn = 0
     private var usageOut = 0
     private var skipAttachOnce = false
-    private val slashCommands = mapOf(
-        "explain" to "Explique ce code de façon claire : rôle, logique, points délicats.",
-        "fix" to "Trouve et corrige les bugs ou erreurs de ce code. Explique brièvement chaque correction.",
-        "tests" to "Écris des tests unitaires pertinents pour ce code (cas nominaux, limites, erreurs), avec le framework de test du projet.",
-        "doc" to "Ajoute une documentation (commentaires de doc) à ce code sans changer son comportement.",
-        "review" to "Fais une revue de code : bugs potentiels, sécurité, lisibilité, performances. Classe les remarques par gravité.",
-    )
+    private val slashCommands = Constants.slashPrompts
 
     // Quota de la session de 5 h : icône batterie cliquable (FR-63) et statut en direct
     private val batteryLabel = JBLabel().apply {
@@ -623,7 +617,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         updateUsage()
         updateQuota(); updateStatus()
         if (remoteOn) RemoteBridge.register(phoneSink)
-        if (System.currentTimeMillis() - settings.state.rlAt > 30 * 60_000L) probeQuota()
+        if (System.currentTimeMillis() - settings.state.rlAt > Constants.quotaStaleMs) probeQuota()
         ApplicationManager.getApplication().executeOnPooledThread { RemoteBridge.ensureStarted() }
         loadProjectFiles()
         installPasteInterceptor(parent)
@@ -1575,7 +1569,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                     continue
                 }
                 val text = runCatching { VfsUtilCore.loadText(vf) }.getOrNull() ?: continue
-                if (text.length > 120_000) { Notifier.warn(project, "${vf.name} est trop volumineux : non joint."); continue }
+                if (text.length > Constants.maxAttachChars) { Notifier.warn(project, "${vf.name} est trop volumineux : non joint."); continue }
                 val rel = relPath(vf)
                 extraFiles.add(rel to "<file path=\"$rel\">\n$text\n</file>")
             }
@@ -1611,7 +1605,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             return rel to "<selection path=\"$rel\" lines=\"$l1-$l2\">\n${sel.selectedText}\n</selection>"
         }
         val text = ed.document.text
-        if (text.length > 120_000) { Notifier.warn(project, "${vf.name} est trop volumineux : non joint."); return null }
+        if (text.length > Constants.maxAttachChars) { Notifier.warn(project, "${vf.name} est trop volumineux : non joint."); return null }
         return rel to "<file path=\"$rel\">\n$text\n</file>"
     }
 
@@ -1856,7 +1850,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             val abs = Mentions.resolve(rel, cwd, projectOnly) ?: return@mapNotNull null
             val vf = LocalFileSystem.getInstance().findFileByPath(abs) ?: return@mapNotNull null
             if (vf.isDirectory || vf.fileType.isBinary) return@mapNotNull null
-            val t = runCatching { VfsUtilCore.loadText(vf) }.getOrNull()?.takeIf { it.length <= 120_000 } ?: return@mapNotNull null
+            val t = runCatching { VfsUtilCore.loadText(vf) }.getOrNull()?.takeIf { it.length <= Constants.maxAttachChars } ?: return@mapNotNull null
             rel to "<file path=\"$rel\">\n$t\n</file>"
         }
 
@@ -1973,16 +1967,13 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val USER_BG = JBColor(Color(0xE8F0FE), Color(0x2D3748))
         val USER_ACCENT = JBColor(Color(0x2F6FDE), Color(0x6EA8FE))
 
-        const val MAX_RESUMES = 6
+        val MAX_RESUMES = Constants.maxAutoResumes
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ChatPanel::class.java)
         /** Dossiers générés ou internes : jamais parcourus pour retrouver les changements d'une commande. */
         /** Lignes ajoutées / retirées. */
         val ADDED = JBColor(Color(0x2E7D32), Color(0x6AAB73))
         val REMOVED = JBColor(Color(0xC62828), Color(0xE57373))
-        val GENERATED_DIRS = setOf(
-            ".git", ".idea", ".gradle", ".kotlin", ".svn", ".hg", ".venv", "venv", "node_modules", "build", "out", "target", "dist",
-            ".next", "__pycache__", ".cache",
-        )
+        val GENERATED_DIRS = Constants.generatedDirs
         val EDIT_TOOLS = setOf("Edit", "Write", "MultiEdit")
         val WRITE_TOOLS = setOf("Edit", "Write", "MultiEdit", "NotebookEdit", "Bash")
     }

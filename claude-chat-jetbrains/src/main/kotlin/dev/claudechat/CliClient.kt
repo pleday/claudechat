@@ -374,8 +374,8 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         /** Silence après un `result` avant de fermer l'entrée de la CLI. */
         /** Processus utilitaires (commandes, quota) : inutile de démarrer les serveurs MCP de l'utilisateur à chaque fois. */
         private val NO_MCP = listOf("--strict-mcp-config", "--mcp-config", """{"mcpServers":{}}""")
-        private const val MCP_WAIT_MS = 15_000L
-        var QUIET_BEFORE_CLOSE_NS = TimeUnit.MINUTES.toNanos(3)
+        private val MCP_WAIT_MS = Constants.mcpWaitMs
+        var QUIET_BEFORE_CLOSE_NS = TimeUnit.MILLISECONDS.toNanos(Constants.quietBeforeCloseMs)
 
         private fun mcpJson(list: List<McpEntry>) = JsonObject().apply {
             add("mcpServers", JsonObject().also { s ->
@@ -394,7 +394,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
          */
         fun probeQuota(cli: String, cwd: String, timeoutSec: Long = 60): ProbeResult = try {
             val cmd = listOf(cli, "-p", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
-                "--permission-mode", "dontAsk", "--permission-prompts", "none", "--model", "claude-haiku-5-5") + NO_MCP
+                "--permission-mode", "dontAsk", "--permission-prompts", "none", "--model", Constants.quotaProbeModel) + NO_MCP
             val p = ProcessBuilder(cmd).directory(java.io.File(cwd)).start()
             p.outputStream.bufferedWriter().use { it.write("ok") }
             val err = StringBuffer()

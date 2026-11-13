@@ -107,8 +107,8 @@ class TelegramBot(
     }
 
     private companion object {
-        const val PAIRING_TTL_MS = 5 * 60_000L
-        const val MAX_PAIRING_FAILURES = 5
+        val PAIRING_TTL_MS = Constants.pairingTtlMs
+        val MAX_PAIRING_FAILURES = Constants.maxPairingFailures
     }
 
     private fun handle(u: JsonObject) {

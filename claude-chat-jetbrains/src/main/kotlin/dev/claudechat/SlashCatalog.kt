@@ -3,12 +3,6 @@ package dev.claudechat
 /** Une commande slash proposée à la saisie, avec sa catégorie et sa description (en français quand elle est connue). */
 data class SlashEntry(val name: String, val category: String, val description: String)
 
-/** Lit les données communes avec l'extension VS Code (`shared/data`, copiées dans les ressources au build). */
-object SharedData {
-    fun read(name: String): com.google.gson.JsonElement =
-        SharedData::class.java.getResourceAsStream("/shared/$name")!!.bufferedReader(Charsets.UTF_8).use { com.google.gson.JsonParser.parseReader(it) }
-}
-
 /** Regroupe et traduit les commandes slash : raccourcis du plugin + commandes renvoyées par la CLI. */
 object SlashCatalog {
     const val PLUGIN = "Raccourcis du plugin"

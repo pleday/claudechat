@@ -5,6 +5,7 @@ import {
   type TurnListener, type TurnOptions,
 } from '../core/cli';
 import { ChangeTracker, FsBaseline, GENERATED_DIRS, type ChangedFile } from '../core/changes';
+import { DEFAULT_MODEL, LIMITS } from '../core/constants';
 import { fmtTokens, isAlias, type ContextUsage } from '../core/cliInfo';
 import { resolveMention } from '../core/mentionPath';
 import { ModelCatalog } from '../core/models';
@@ -70,8 +71,8 @@ interface Interaction {
   id: string;
 }
 
-const MAX_RESUMES = 6;
-const MAX_ATTACH_CHARS = 120_000;
+const MAX_RESUMES = LIMITS.maxAutoResumes;
+const MAX_ATTACH_CHARS = LIMITS.maxAttachChars;
 const IMAGE_MEDIA: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
 
 interface ImageAttachment { name: string; media: string; data: string }
@@ -150,7 +151,7 @@ export class ChatSession implements RemoteSink {
   constructor(private env: SessionEnv) {
     this.tracker = new ChangeTracker(() => this.env.cwd());
     this.baseline = new FsBaseline(() => this.env.cwd(), (n) => GENERATED_DIRS.has(n));
-    this.selectedModel = this.catalog.resolve(env.getState('model', env.config('model', 'claude-sonnet-5-5')));
+    this.selectedModel = this.catalog.resolve(env.getState('model', env.config('model', DEFAULT_MODEL)));
     this.selectedEffort = env.getState('effort', env.config('effort', 'auto'));
     this.selectedMode = env.getState('permissionMode', env.config('permissionMode', 'manual'));
     this.busyMode = env.getState<string>('busyMode', env.config<string>('busyMode', 'refine')) === 'queue' ? 'queue' : 'refine';
@@ -394,7 +395,7 @@ export class ChatSession implements RemoteSink {
 
   private async probeQuotaIfStale(): Promise<void> {
     const at = this.env.getState('rlAt', 0);
-    if (Date.now() - at > 10 * 60_000) await this.probeQuota();
+    if (Date.now() - at > LIMITS.quotaStaleMs) await this.probeQuota();
   }
 
   // ---------- Entrées du transcript ----------
@@ -501,7 +502,7 @@ export class ChatSession implements RemoteSink {
     // photo du projet avant que Claude agisse ; les fichiers que l'utilisateur a modifiés depuis la réponse précédente repartent de zéro
     this.chain(async () => { this.tracker.startTurn(); await this.baseline.capture(); });
     this.tick();
-    const model = this.selectedModel.trim() || this.env.config('model', 'claude-sonnet-5-5');
+    const model = this.selectedModel.trim() || this.env.config('model', DEFAULT_MODEL);
     this.saveChoices();
     this.sendStatus();
     this.patch({ suggestion: null });

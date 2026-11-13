@@ -1,19 +1,13 @@
 import type { CliModel } from './cliInfo';
+import { FALLBACK_MODELS } from './constants';
 
 /**
  * Catalogue des modèles. Les modèles viennent de la CLI (réponse `initialize`, voir update) : nouveaux modèles,
  * noms et niveaux d'effort pris en charge sont ainsi toujours à jour. La liste figée ne sert que de secours
  * tant que la CLI n'a pas répondu (ou si elle est injoignable).
  */
-const fallback: Array<[string, string]> = [
-  ['claude-fable-5-2', 'Fable 5.2'],
-  ['claude-opus-5-5', 'Opus 5.5'],
-  ['claude-sonnet-5-5', 'Sonnet 5.5'],
-  ['claude-haiku-5-5', 'Haiku 5.5'],
-];
-const fallbackAliases: Record<string, string> = {
-  fable: 'claude-fable-5-2', opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5',
-};
+const fallback: Array<[string, string]> = FALLBACK_MODELS.map((m) => [m.id, m.name]);
+const fallbackAliases: Record<string, string> = Object.fromEntries(FALLBACK_MODELS.map((m) => [m.alias, m.id]));
 
 export class ModelCatalog {
   private fromCli: CliModel[] = [];

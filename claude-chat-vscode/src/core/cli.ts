@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { parseContextUsage, parseCommands, parseModels, controlPayload, type CliCommand, type CliModel, type ContextUsage } from './cliInfo';
+import { LIMITS, QUOTA_PROBE_MODEL } from './constants';
 import { resultText } from './sessions';
 
 export type Json = Record<string, any>;
@@ -99,13 +100,13 @@ export interface TurnListener {
 }
 
 const RESUME_EVENTS = new Set(['stream_event', 'assistant', 'control_request']);
-const MCP_WAIT_MS = 15_000;
+const MCP_WAIT_MS = LIMITS.mcpWaitMs;
 /** Processus utilitaires (commandes, quota) : inutile de démarrer les serveurs MCP de l'utilisateur à chaque fois. */
 const NO_MCP = ['--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}'];
 
 export const timing = {
   /** Silence après un `result` avant de fermer l'entrée de la CLI (modifiable par les tests). */
-  quietBeforeCloseMs: 3 * 60_000,
+  quietBeforeCloseMs: LIMITS.quietBeforeCloseMs,
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -498,7 +499,7 @@ export async function contextUsageOnce(cli: string, cwd: string, sessionId?: str
 export function probeQuota(cli: string, cwd: string, timeoutSec = 60): Promise<ProbeResult> {
   return new Promise((resolve) => {
     const args = ['-p', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--permission-mode', 'dontAsk',
-      '--permission-prompts', 'none', '--model', 'claude-haiku-5-5', ...NO_MCP];
+      '--permission-prompts', 'none', '--model', QUOTA_PROBE_MODEL, ...NO_MCP];
     let p: ChildProcess;
     try { p = spawn(cli, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] }); }
     catch (e) { resolve({ error: `impossible de lancer la CLI : ${(e as Error).message}` }); return; }

@@ -12,9 +12,9 @@ data class VideoInfo(val durationSec: Double, val width: Int, val height: Int, v
  * accompagnées d'un texte qui donne les instants. La piste audio n'est pas transmise.
  */
 object VideoTools {
-    val EXTENSIONS = setOf("mp4", "mov", "m4v", "webm", "mkv", "avi", "mpg", "mpeg", "wmv", "flv", "3gp")
-    const val MAX_FRAMES = 10
-    const val MAX_WIDTH = 1024
+    val EXTENSIONS: Set<String> = Constants.videoExtensions
+    val MAX_FRAMES: Int = Constants.maxVideoFrames
+    val MAX_WIDTH: Int = Constants.maxVideoWidth
 
     fun isVideo(fileName: String) = fileName.substringAfterLast('.', "").lowercase() in EXTENSIONS
 

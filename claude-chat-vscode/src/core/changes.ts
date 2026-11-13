@@ -3,6 +3,7 @@ import * as fsSync from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import type { Json } from './cli';
+import { GENERATED_DIRS, LIMITS } from './constants';
 
 export type ChangeStatus = 'modified' | 'new' | 'deleted';
 
@@ -132,11 +133,7 @@ interface Stat { size: number; mtime: number }
 interface SnapEntry { stat: Stat; content: string | null }
 export interface Observed { path: string; kind: 'modified' | 'new' | 'deleted'; before: string | null }
 
-/** Dossiers générés ou internes : jamais parcourus pour retrouver les changements d'une commande. */
-export const GENERATED_DIRS = new Set([
-  '.git', '.idea', '.gradle', '.kotlin', '.svn', '.hg', '.venv', 'venv', 'node_modules', 'build', 'out', 'target', 'dist',
-  '.next', '__pycache__', '.cache', '.vscode-test',
-]);
+export { GENERATED_DIRS };
 
 /**
  * Photo du projet (taille, date et contenu des petits fichiers texte), prise avant que Claude agisse. Une commande (Bash,
@@ -154,9 +151,9 @@ export class FsBaseline {
     private root: () => string,
     private skipDir: (name: string) => boolean = () => false,
     private skipFile: (name: string) => boolean = () => false,
-    private maxFileBytes = 256 * 1024,
-    private maxTotalBytes = 24 * 1024 * 1024,
-    private maxEntries = 60_000,
+    private maxFileBytes = LIMITS.baselineMaxFileBytes,
+    private maxTotalBytes = LIMITS.baselineMaxTotalBytes,
+    private maxEntries = LIMITS.baselineMaxEntries,
   ) {}
 
   get fileCount(): number { return this.snapshot.size; }

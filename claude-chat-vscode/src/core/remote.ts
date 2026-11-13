@@ -1,4 +1,5 @@
 import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { LIMITS } from './constants';
 import { chunkText } from './textTools';
 import type { Json } from './cli';
 
@@ -8,8 +9,8 @@ export interface TelegramHandler {
   onPaired(chatId: number): void;
 }
 
-const PAIRING_TTL_MS = 5 * 60_000;
-const MAX_PAIRING_FAILURES = 5;
+const PAIRING_TTL_MS = LIMITS.pairingTtlMs;
+const MAX_PAIRING_FAILURES = LIMITS.maxPairingFailures;
 
 /**
  * Client minimal de l'API Bot de Telegram en long polling : aucune connexion entrante, aucun tunnel.

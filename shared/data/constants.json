@@ -1,0 +1,44 @@
+{
+  "permissionModes": [
+    { "id": "manual", "label": "Demander", "help": "Claude demande ton accord avant chaque action sensible" },
+    { "id": "acceptEdits", "label": "Modifs auto", "help": "Les modifications de fichiers sont acceptées sans demander ; le reste est demandé" },
+    { "id": "plan", "label": "Plan", "help": "Claude propose un plan à valider avant d'agir" },
+    { "id": "auto", "label": "Auto", "help": "Mode automatique de la CLI" },
+    { "id": "dontAsk", "label": "Sans demande", "help": "Tout ce qui demanderait une autorisation est refusé automatiquement" },
+    { "id": "bypassPermissions", "label": "Tout autoriser", "help": "Aucune demande : Claude agit librement (à réserver aux environnements sûrs)" }
+  ],
+  "efforts": ["auto", "low", "medium", "high", "xhigh", "max"],
+  "fallbackModels": [
+    { "id": "claude-fable-5-2", "alias": "fable", "name": "Fable 5.2" },
+    { "id": "claude-opus-5-5", "alias": "opus", "name": "Opus 5.5" },
+    { "id": "claude-sonnet-5-5", "alias": "sonnet", "name": "Sonnet 5.5" },
+    { "id": "claude-haiku-5-5", "alias": "haiku", "name": "Haiku 5.5" }
+  ],
+  "defaultModel": "claude-sonnet-5-5",
+  "quotaProbeModel": "claude-haiku-5-5",
+  "slashPrompts": {
+    "explain": "Explique ce code de façon claire : rôle, logique, points délicats.",
+    "fix": "Trouve et corrige les bugs ou erreurs de ce code. Explique brièvement chaque correction.",
+    "tests": "Écris des tests unitaires pertinents pour ce code (cas nominaux, limites, erreurs), avec le framework de test du projet.",
+    "doc": "Ajoute une documentation (commentaires de doc) à ce code sans changer son comportement.",
+    "review": "Fais une revue de code : bugs potentiels, sécurité, lisibilité, performances. Classe les remarques par gravité."
+  },
+  "commitPrompt": "Rédige le message de commit pour les changements ci-dessous, au format Conventional Commits : un titre de 72 caractères maximum, une ligne vide, puis un corps concis (puces) seulement si c'est utile. Réponds uniquement avec le message, sans bloc de code ni commentaire.\n\n",
+  "generatedDirs": [".git", ".idea", ".gradle", ".kotlin", ".svn", ".hg", ".venv", "venv", "node_modules", "build", "out", "target", "dist", ".next", "__pycache__", ".cache", ".vscode-test"],
+  "videoExtensions": ["mp4", "mov", "m4v", "webm", "mkv", "avi", "mpg", "mpeg", "wmv", "flv", "3gp"],
+  "limits": {
+    "maxAttachChars": 120000,
+    "maxVideoFrames": 10,
+    "maxVideoWidth": 1024,
+    "baselineMaxFileBytes": 262144,
+    "baselineMaxTotalBytes": 25165824,
+    "baselineMaxEntries": 60000,
+    "commitDiffMaxChars": 60000,
+    "mcpWaitMs": 15000,
+    "pairingTtlMs": 300000,
+    "maxPairingFailures": 5,
+    "quietBeforeCloseMs": 180000,
+    "maxAutoResumes": 6,
+    "quotaStaleMs": 1800000
+  }
+}

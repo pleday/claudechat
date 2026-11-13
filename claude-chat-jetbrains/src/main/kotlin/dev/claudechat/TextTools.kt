@@ -116,13 +116,8 @@ fun describeTool(name: String, i: JsonObject): String {
  * tant que la CLI n'a pas répondu (ou si elle est injoignable).
  */
 object ModelCatalog {
-    private val fallback = listOf(
-        "claude-fable-5-2" to "Fable 5.2",
-        "claude-opus-5-5" to "Opus 5.5",
-        "claude-sonnet-5-5" to "Sonnet 5.5",
-        "claude-haiku-5-5" to "Haiku 5.5",
-    )
-    private val fallbackAliases = mapOf("fable" to "claude-fable-5-2", "opus" to "claude-opus-5-5", "sonnet" to "claude-sonnet-5-5", "haiku" to "claude-haiku-5-5")
+    private val fallback = Constants.fallbackModels.map { it.first to it.third }
+    private val fallbackAliases = Constants.fallbackModels.associate { it.second to it.first }
 
     @Volatile private var fromCli: List<CliModel> = emptyList()
 

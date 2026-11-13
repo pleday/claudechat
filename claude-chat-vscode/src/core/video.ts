@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { LIMITS, VIDEO_EXTENSIONS } from './constants';
 
 export interface VideoInfo { durationSec: number; width: number; height: number; hasAudio: boolean }
 
@@ -8,9 +9,9 @@ export interface VideoInfo { durationSec: number; width: number; height: number;
  * Pièces jointes vidéo. L'API n'accepte pas la vidéo : on en extrait quelques images (ffmpeg) envoyées comme images,
  * accompagnées d'un texte qui donne les instants. La piste audio n'est pas transmise.
  */
-export const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', 'mpg', 'mpeg', 'wmv', 'flv', '3gp']);
-export const MAX_FRAMES = 10;
-export const MAX_WIDTH = 1024;
+export { VIDEO_EXTENSIONS };
+export const MAX_FRAMES = LIMITS.maxVideoFrames;
+export const MAX_WIDTH = LIMITS.maxVideoWidth;
 
 export const isVideo = (fileName: string) => VIDEO_EXTENSIONS.has(fileName.split('.').pop()?.toLowerCase() ?? '');
 

@@ -16,7 +16,7 @@ import java.util.UUID
 class ClaudeSettings : PersistentStateComponent<ClaudeSettings.State> {
     class State {
         var cliPath: String = ""
-        var model: String = "claude-sonnet-5-5"
+        var model: String = Constants.defaultModel
         var effort: String = "auto"
         var permissionMode: String = "manual"
         var customModels: String = ""

@@ -1,4 +1,5 @@
 import type { Json, QuotaWindow, RateLimits } from './cli';
+import { EFFORTS, PERMISSION_MODES, SLASH_PROMPTS } from './constants';
 
 /** Recherche floue de fichiers pour les mentions `@`. */
 export const Fuzzy = {
@@ -93,24 +94,8 @@ export function filePathOf(i: Json): string | undefined {
 export const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit']);
 export const isCommandTool = (name: string) => name === 'Bash' || name === 'Task' || name === 'Agent' || name.startsWith('mcp__');
 
-export const PERMISSION_MODES: ReadonlyArray<readonly [string, string, string]> = [
-  ['manual', 'Demander', 'Claude demande ton accord avant chaque action sensible'],
-  ['acceptEdits', 'Modifs auto', 'Les modifications de fichiers sont acceptées sans demander ; le reste est demandé'],
-  ['plan', 'Plan', "Claude propose un plan à valider avant d'agir"],
-  ['auto', 'Auto', 'Mode automatique de la CLI'],
-  ['dontAsk', 'Sans demande', 'Tout ce qui demanderait une autorisation est refusé automatiquement'],
-  ['bypassPermissions', 'Tout autoriser', 'Aucune demande : Claude agit librement (à réserver aux environnements sûrs)'],
-];
-export const EFFORTS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'];
+export { EFFORTS, PERMISSION_MODES, SLASH_PROMPTS };
 
-/** Prompts des raccourcis `/explain`, `/fix`… (menu contextuel de l'éditeur et saisie). */
-export const SLASH_PROMPTS: Record<string, string> = {
-  explain: 'Explique ce code de façon claire : rôle, logique, points délicats.',
-  fix: 'Trouve et corrige les bugs ou erreurs de ce code. Explique brièvement chaque correction.',
-  tests: 'Écris des tests unitaires pertinents pour ce code (cas nominaux, limites, erreurs), avec le framework de test du projet.',
-  doc: 'Ajoute une documentation (commentaires de doc) à ce code sans changer son comportement.',
-  review: 'Fais une revue de code : bugs potentiels, sécurité, lisibilité, performances. Classe les remarques par gravité.',
-};
 
 /** `/explain détail` devient le prompt complet suivi du détail ; texte inchangé pour toute autre commande. */
 export function expandSlash(t: string): string {

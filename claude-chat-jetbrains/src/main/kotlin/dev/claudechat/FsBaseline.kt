@@ -23,9 +23,9 @@ class FsBaseline(
     private val root: () -> String,
     private val skipDir: (String) -> Boolean = { false },
     private val skipFile: (String) -> Boolean = { false },
-    private val maxFileBytes: Long = 256 * 1024,
-    private val maxTotalBytes: Long = 24L * 1024 * 1024,
-    private val maxEntries: Int = 60_000,
+    private val maxFileBytes: Long = Constants.baselineMaxFileBytes,
+    private val maxTotalBytes: Long = Constants.baselineMaxTotalBytes,
+    private val maxEntries: Int = Constants.baselineMaxEntries,
 ) {
     data class Stat(val size: Long, val mtime: Long)
 

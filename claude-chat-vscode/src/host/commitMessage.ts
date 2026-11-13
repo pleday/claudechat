@@ -1,9 +1,6 @@
 import * as vscode from 'vscode';
 import { oneShot } from '../core/cli';
-
-const PROMPT = 'Rédige le message de commit pour les changements ci-dessous, au format Conventional Commits : ' +
-  "un titre de 72 caractères maximum, une ligne vide, puis un corps concis (puces) seulement si c'est utile. " +
-  'Réponds uniquement avec le message, sans bloc de code ni commentaire.\n\n';
+import { COMMIT_PROMPT, LIMITS } from '../core/constants';
 
 interface GitRepo { rootUri: vscode.Uri; inputBox: { value: string }; diff(cached?: boolean): Promise<string> }
 interface GitApi { repositories: GitRepo[]; getRepository(uri: vscode.Uri): GitRepo | null }
@@ -24,11 +21,11 @@ export async function generateCommitMessage(cli: string, model: string, scm?: { 
     let diff = await repo.diff(true);
     if (!diff.trim()) diff = await repo.diff(false);
     if (!diff.trim()) { void vscode.window.showWarningMessage('Aucun changement à décrire.'); return; }
-    if (diff.length > 60_000) diff = diff.slice(0, 60_000) + '\n[... diff tronqué ...]';
+    if (diff.length > LIMITS.commitDiffMaxChars) diff = diff.slice(0, LIMITS.commitDiffMaxChars) + '\n[... diff tronqué ...]';
     const ctl = new AbortController();
     token.onCancellationRequested(() => ctl.abort());
     try {
-      const out = await oneShot(cli, repo.rootUri.fsPath, model, PROMPT + diff, ctl.signal);
+      const out = await oneShot(cli, repo.rootUri.fsPath, model, COMMIT_PROMPT + diff, ctl.signal);
       const msg = cleanCommitMessage(out);
       if (msg && !token.isCancellationRequested) repo.inputBox.value = msg;
     } catch (e) {
