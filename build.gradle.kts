@@ -34,6 +34,23 @@ tasks.test {
 
 kotlin { jvmToolchain(21) }
 
+// IDE de test (`make run`) : l'IDE 2024.3 plante au démarrage dans son plugin Gradle (« IllegalArgumentException: 25 »). Il relit
+// les versions de Java récentes qu'il a téléchargées (jusqu'à 26) et ne sait plus les analyser. Claude Chat n'utilise pas Gradle :
+// on désactive ce plugin (et ceux qui en dépendent) dans le sandbox seulement, jamais dans l'IDE de l'utilisateur.
+tasks.prepareSandbox {
+    doLast {
+        sandboxConfigDirectory.get().asFile.resolve("disabled_plugins.txt").apply {
+            parentFile.mkdirs()
+            writeText(
+                listOf(
+                    "org.jetbrains.plugins.gradle", "org.jetbrains.plugins.gradle.analysis",
+                    "org.jetbrains.plugins.gradle.dependency.updater", "org.jetbrains.plugins.gradle.maven",
+                ).joinToString("\n", postfix = "\n"),
+            )
+        }
+    }
+}
+
 intellijPlatform {
     // Évite de lancer un second IDE pendant la construction (impossible si `make run` est ouvert) ;
     // seul l'index de la recherche des réglages en dépend.
