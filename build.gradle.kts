@@ -1,3 +1,5 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.0.21"
@@ -57,7 +59,13 @@ intellijPlatform {
     buildSearchableOptions = false
     // Compatibilité sur les IDE récents (untilBuild est ouvert : l'API interne utilisée peut casser) : `./gradlew verifyPlugin`
     pluginVerification {
-        ides { recommended() }
+        // Liste explicite : recommended() choisit IntelliJ IDEA Community 2025.3, qui n'est plus publiée (IDE unifié depuis cette version).
+        ides {
+            ide(IntelliJPlatformType.IntellijIdeaCommunity, "2024.3")
+            ide(IntelliJPlatformType.IntellijIdeaCommunity, "2025.1")
+            ide(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2")
+            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2025.3")
+        }
     }
     pluginConfiguration {
         ideaVersion {
