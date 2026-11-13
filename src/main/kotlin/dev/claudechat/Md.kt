@@ -1,11 +1,12 @@
 package dev.claudechat
 
+import org.commonmark.ext.autolink.AutolinkExtension
 import org.commonmark.ext.gfm.tables.TablesExtension
 import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
 
 object Md {
-    private val exts = listOf(TablesExtension.create())
+    private val exts = listOf(TablesExtension.create(), AutolinkExtension.create())
     private val parser = Parser.builder().extensions(exts).build()
     private val renderer = HtmlRenderer.builder().extensions(exts).escapeHtml(true).sanitizeUrls(true).build()
 
