@@ -151,6 +151,37 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         add(scroll, "chat")
         add(JBScrollPane(welcome).apply { border = JBUI.Borders.empty() }, "welcome")
     }
+    // Message de l'utilisateur épinglé en haut de la conversation : une ligne discrète, dépliable d'un clic (voir StickyPrompt)
+    private var stickyChoice: StickyPrompt.Choice? = null
+    private var stickyOpen = false
+    private val stickyLabel = object : JBLabel() {
+        // largeur nulle : un message long ne doit pas élargir le panneau, le libellé est tronqué avec « … »
+        override fun getPreferredSize() = java.awt.Dimension(0, super.getPreferredSize().height)
+    }.apply {
+        font = JBUI.Fonts.smallFont()
+        foreground = UIUtil.getContextHelpForeground()
+        iconTextGap = JBUI.scale(4)
+        border = JBUI.Borders.empty(2, 6)
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        toolTipText = "Votre message — cliquer pour l'afficher ou le masquer"
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) { stickyOpen = !stickyOpen; applySticky() }
+        })
+    }
+    private val stickyText = JBTextArea().apply {
+        isEditable = false; lineWrap = true; wrapStyleWord = true
+        font = JBUI.Fonts.smallFont()
+        isOpaque = false
+        border = JBUI.Borders.empty(0, 24, 4, 6)
+    }
+    private val stickyScroll = JBScrollPane(stickyText).apply { border = JBUI.Borders.empty(); isOpaque = false; viewport.isOpaque = false; isVisible = false }
+    private val stickyBar = JPanel(BorderLayout()).apply {
+        isVisible = false
+        border = JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0)
+        add(stickyLabel, BorderLayout.NORTH)
+        add(stickyScroll, BorderLayout.CENTER)
+    }
+
     private val input = object : JBTextArea(3, 20) {
         override fun paste() {
             if (!pasteFromClipboard(null, "paste()")) super.paste()
@@ -480,7 +511,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         val splitter = JBSplitter(true, 0.78f).apply {
             firstComponent = JPanel(BorderLayout()).apply {
-                add(transcriptCards, BorderLayout.CENTER)
+                add(JPanel(BorderLayout()).apply { add(stickyBar, BorderLayout.NORTH); add(transcriptCards, BorderLayout.CENTER) }, BorderLayout.CENTER)
                 add(JPanel(BorderLayout()).apply { add(JPanel(BorderLayout()).apply {
                     add(statusLabel, BorderLayout.CENTER)
                     add(JPanel(FlowLayout(FlowLayout.RIGHT, 2, 0)).apply { add(cancelResumeLink); add(usageLabel); add(batteryLabel) }, BorderLayout.EAST)
@@ -1692,6 +1723,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val oldValue = bar.value
         (transcriptCards.layout as java.awt.CardLayout).show(transcriptCards, if (session.entries.isEmpty()) "welcome" else "chat")
         titleLabel.text = customTitle ?: session.title
+        updateSticky()
         content?.displayName = tabTitle()
         syncSend()
         view.background = UIUtil.getEditorPaneBackground()
@@ -1701,6 +1733,33 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         if (html != lastHtml) { view.text = html; lastHtml = html }
         // FR-08 : ne pas faire sauter le défilement si l'utilisateur est remonté.
         SwingUtilities.invokeLater { bar.value = if (atBottom) bar.maximum else oldValue }
+    }
+
+    /** Épingle le dernier message de l'utilisateur, ou le précédent si le dernier ne fait que demander de reprendre. */
+    private fun updateSticky() {
+        // les précisions envoyées en cours de réponse (note) complètent un message, elles ne le remplacent pas
+        val choice = StickyPrompt.pick(session.entries.filter { it.kind == Kind.USER && it.note == null }.map { it.text })
+        if (choice == stickyChoice) return
+        if (choice?.prompt != stickyChoice?.prompt) stickyOpen = false     // nouveau message : on revient à la ligne discrète
+        stickyChoice = choice
+        applySticky()
+    }
+
+    private fun applySticky() {
+        val c = stickyChoice
+        stickyBar.isVisible = c != null
+        if (c == null) return
+        stickyLabel.icon = if (stickyOpen) AllIcons.General.ArrowDown else AllIcons.General.ArrowRight
+        stickyLabel.text = (if (c.resumedWith != null) "↻ " else "") + c.prompt.replace(Regex("\\s+"), " ").trim()
+        stickyScroll.isVisible = stickyOpen
+        if (stickyOpen) {
+            val text = c.prompt + (c.resumedWith?.let { "\n\n↻ Dernier message : ${it.trim()}" } ?: "")
+            stickyText.text = text; stickyText.caretPosition = 0
+            // hauteur selon la longueur (lignes estimées), plafonnée : au-delà, ascenseur
+            val lines = text.lines().sumOf { 1 + it.length / 80 }.coerceIn(1, 9)
+            stickyScroll.preferredSize = java.awt.Dimension(0, lines * stickyText.getFontMetrics(stickyText.font).height + JBUI.scale(8))
+        }
+        stickyBar.revalidate(); stickyBar.repaint()
     }
 
     private fun tabTitle(): String =
