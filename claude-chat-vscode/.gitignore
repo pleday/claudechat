@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-vsix/
+*.vsix
+# copiés depuis ../shared par esbuild.mjs
+media/avatar.png
+media/claude.svg
+dist-e2e/
+.vscode-test/

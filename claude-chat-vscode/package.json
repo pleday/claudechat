@@ -1,0 +1,388 @@
+{
+  "name": "claude-chat-vscode",
+  "displayName": "Claude Chat",
+  "description": "Interface graphique pour Claude Code (CLI claude) : conversation en streaming, cartes d'outils, approbation des actions, diff modifiable, sessions reprenables, MCP, message de commit.",
+  "version": "0.9.0",
+  "publisher": "pleday",
+  "license": "UNLICENSED",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:pleday/claudechat.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "icon": "media/icon.png",
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudeChat",
+          "title": "Claude Chat",
+          "icon": "media/claude.svg"
+        }
+      ]
+    },
+    "views": {
+      "claudeChat": [
+        {
+          "type": "webview",
+          "id": "claudeChat.chat",
+          "name": "Conversation",
+          "icon": "media/claude.svg"
+        },
+        {
+          "id": "claudeChat.changes",
+          "name": "Fichiers modifiés par Claude",
+          "icon": "media/claude.svg",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "claudeChat.changes",
+        "contents": "Claude n'a modifié aucun fichier dans cette conversation."
+      }
+    ],
+    "commands": [
+      {
+        "command": "claudeChat.focus",
+        "title": "Ouvrir la conversation",
+        "category": "Claude Chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "claudeChat.newTab",
+        "title": "Nouvelle conversation dans un onglet",
+        "category": "Claude Chat",
+        "icon": "$(add)"
+      },
+      {
+        "command": "claudeChat.newConversation",
+        "title": "Recommencer à zéro",
+        "category": "Claude Chat",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claudeChat.sessions",
+        "title": "Reprendre une session…",
+        "category": "Claude Chat",
+        "icon": "$(history)"
+      },
+      {
+        "command": "claudeChat.mcp",
+        "title": "Serveurs MCP…",
+        "category": "Claude Chat",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "claudeChat.settings",
+        "title": "Réglages",
+        "category": "Claude Chat",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "claudeChat.sendSelection",
+        "title": "Envoyer la sélection à Claude Chat",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.explain",
+        "title": "Expliquer",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.fix",
+        "title": "Corriger",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.tests",
+        "title": "Générer des tests",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.doc",
+        "title": "Documenter",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.review",
+        "title": "Revue de code",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.commitMessage",
+        "title": "Générer le message de commit avec Claude",
+        "category": "Claude Chat",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "claudeChat.pairPhone",
+        "title": "Appairer mon téléphone (Telegram)",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.setTelegramToken",
+        "title": "Définir le jeton du bot Telegram",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.openChange",
+        "title": "Voir les modifications de Claude sur ce fichier",
+        "category": "Claude Chat"
+      },
+      {
+        "command": "claudeChat.forgetChanges",
+        "title": "Oublier les fichiers modifiés",
+        "category": "Claude Chat",
+        "icon": "$(clear-all)"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "claudeChat.editorMenu",
+        "label": "Claude Chat"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "submenu": "claudeChat.editorMenu",
+          "when": "editorHasSelection",
+          "group": "9_claudeChat"
+        }
+      ],
+      "claudeChat.editorMenu": [
+        {
+          "command": "claudeChat.explain",
+          "group": "1_prompts@1"
+        },
+        {
+          "command": "claudeChat.fix",
+          "group": "1_prompts@2"
+        },
+        {
+          "command": "claudeChat.tests",
+          "group": "1_prompts@3"
+        },
+        {
+          "command": "claudeChat.doc",
+          "group": "1_prompts@4"
+        },
+        {
+          "command": "claudeChat.review",
+          "group": "1_prompts@5"
+        },
+        {
+          "command": "claudeChat.sendSelection",
+          "group": "2_send"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "claudeChat.commitMessage",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "claudeChat.newConversation",
+          "when": "view == claudeChat.chat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "claudeChat.sessions",
+          "when": "view == claudeChat.chat",
+          "group": "navigation@2"
+        },
+        {
+          "command": "claudeChat.newTab",
+          "when": "view == claudeChat.chat",
+          "group": "navigation@3"
+        },
+        {
+          "command": "claudeChat.mcp",
+          "when": "view == claudeChat.chat",
+          "group": "overflow@1"
+        },
+        {
+          "command": "claudeChat.settings",
+          "when": "view == claudeChat.chat",
+          "group": "overflow@2"
+        },
+        {
+          "command": "claudeChat.forgetChanges",
+          "when": "view == claudeChat.changes",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "claudeChat.openChange",
+          "when": "false"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "claudeChat.sendSelection",
+        "key": "ctrl+alt+shift+c",
+        "mac": "cmd+alt+shift+c",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "claudeChat.focus",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Chat",
+      "properties": {
+        "claudeChat.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Exécutable claude. Vide : ~/.local/bin/claude s'il existe, sinon `claude` du PATH."
+        },
+        "claudeChat.model": {
+          "type": "string",
+          "default": "claude-sonnet-5-5",
+          "description": "Modèle par défaut des nouvelles conversations."
+        },
+        "claudeChat.effort": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "description": "Niveau d'effort par défaut."
+        },
+        "claudeChat.permissionMode": {
+          "type": "string",
+          "default": "manual",
+          "enum": [
+            "manual",
+            "acceptEdits",
+            "plan",
+            "auto",
+            "dontAsk",
+            "bypassPermissions"
+          ],
+          "enumDescriptions": [
+            "Demander : Claude demande ton accord avant chaque action sensible",
+            "Modifs auto : les modifications de fichiers sont acceptées sans demander",
+            "Plan : Claude propose un plan à valider avant d'agir",
+            "Auto : mode automatique de la CLI",
+            "Sans demande : tout ce qui demanderait une autorisation est refusé",
+            "Tout autoriser : aucune demande (à réserver aux environnements sûrs)"
+          ],
+          "description": "Mode de permission par défaut."
+        },
+        "claudeChat.customModels": {
+          "type": "string",
+          "default": "",
+          "description": "Modèles supplémentaires, séparés par des virgules."
+        },
+        "claudeChat.systemPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Consigne ajoutée au prompt système (--append-system-prompt)."
+        },
+        "claudeChat.notify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Notifier quand Claude a terminé ou attend une réponse."
+        },
+        "claudeChat.autoResume": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reprendre seul quand le quota se réinitialise."
+        },
+        "claudeChat.autoResumeDelayMin": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "description": "Délai (minutes) après la réinitialisation du quota avant la reprise."
+        },
+        "claudeChat.busyMode": {
+          "type": "string",
+          "default": "refine",
+          "enum": [
+            "refine",
+            "queue"
+          ],
+          "enumDescriptions": [
+            "Préciser : injecté dans la réponse en cours",
+            "File d'attente : envoyé après la réponse"
+          ],
+          "description": "Que fait « Envoyer » pendant que Claude répond ?"
+        },
+        "claudeChat.autoDiff": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ouvrir le diff automatiquement quand Claude demande à modifier un fichier."
+        },
+        "claudeChat.promptSuggestions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Proposer le message suivant après chaque réponse (une petite requête en plus, environ 10 % de coût)."
+        },
+        "claudeChat.remote.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Accès à distance : bot Telegram pour répondre depuis le téléphone."
+        },
+        "claudeChat.remote.default": {
+          "type": "boolean",
+          "default": false,
+          "description": "Activer l'accès à distance dès l'ouverture de chaque conversation."
+        },
+        "claudeChat.remote.chatId": {
+          "type": "string",
+          "default": "",
+          "description": "Identifiant du chat Telegram appairé (renseigné par l'appairage)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "npm run typecheck && npm test && npm run build && vsce package --no-dependencies",
+    "vscode:prepublish": "npm run build",
+    "test:e2e": "node esbuild.mjs && node esbuild.e2e.mjs && node e2e/run.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.9.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "diff": "^8.0.0",
+    "dompurify": "^3.2.0",
+    "marked": "^15.0.0"
+  }
+}
