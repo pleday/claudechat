@@ -619,14 +619,14 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         render(forceBottom = true)
     }
 
-    private fun dispatch(original: String) {
+    private fun dispatch(original: String, fromPhone: Boolean = false) {
         val text = expandSlash(original)
         val noAttach = skipAttachOnce
         skipAttachOnce = false
         val blocks = mutableListOf<Pair<String, String>>()
         if (contextOn && !noAttach) currentFileAttachment()?.let { blocks.add(it) }
         blocks.addAll(extraFiles)
-        blocks.addAll(mentionAttachments(original))
+        blocks.addAll(mentionAttachments(original, projectOnly = fromPhone))
         val files = blocks.distinctBy { it.first }
         val images = extraImages.toList()
         extraFiles.clear(); extraImages.clear(); updateExtras()
@@ -957,7 +957,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             session.entries.add(Entry(Kind.NOTICE, "📱 Message reçu du téléphone."))
             RemoteBridge.say(phoneSink, "▶ Envoyé à Claude.")
             skipAttachOnce = true
-            dispatch(text)
+            dispatch(text, fromPhone = true)
         }
     }
 
@@ -1584,9 +1584,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     /** Joint les fichiers mentionnés par `@chemin` qui existent dans le projet (FR-13). */
-    private fun mentionAttachments(text: String): List<Pair<String, String>> =
+    private fun mentionAttachments(text: String, projectOnly: Boolean = false): List<Pair<String, String>> =
         Mentions.find(text).mapNotNull { rel ->
-            val vf = LocalFileSystem.getInstance().findFileByPath(if (rel.startsWith("/")) rel else "$cwd/$rel") ?: return@mapNotNull null
+            val abs = Mentions.resolve(rel, cwd, projectOnly) ?: return@mapNotNull null
+            val vf = LocalFileSystem.getInstance().findFileByPath(abs) ?: return@mapNotNull null
             if (vf.isDirectory || vf.fileType.isBinary) return@mapNotNull null
             val t = runCatching { VfsUtilCore.loadText(vf) }.getOrNull()?.takeIf { it.length <= 120_000 } ?: return@mapNotNull null
             rel to "<file path=\"$rel\">\n$t\n</file>"

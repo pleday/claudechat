@@ -192,4 +192,14 @@ class QueueToolsTest {
         assertEquals(2, l.moveItem(0, 99)); assertEquals(listOf("a", "b", "c"), l)
         assertEquals(5, l.moveItem(5, 0), "index invalide ignoré")
     }
+
+    @Test fun mentionResolveAcceptsAnyPathFromTheIdeButStaysInProjectFromThePhone() {
+        assertEquals("/p/src/A.kt", Mentions.resolve("src/A.kt", "/p", projectOnly = true))
+        assertEquals("/p/src/A.kt", Mentions.resolve("/p/src/A.kt", "/p", projectOnly = true))
+        assertNull(Mentions.resolve("/home/u/.ssh/id_rsa", "/p", projectOnly = true))
+        assertNull(Mentions.resolve("../autre/secret.txt", "/p", projectOnly = true))
+        assertNull(Mentions.resolve("src/../../etc/passwd", "/p", projectOnly = true))
+        assertEquals("/etc/hosts", Mentions.resolve("/etc/hosts", "/p", projectOnly = false))
+        assertNull(Mentions.resolve("/p2/x", "/p", projectOnly = true), "préfixe de chaîne ≠ sous-dossier")
+    }
 }

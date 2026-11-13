@@ -40,6 +40,16 @@ object Mentions {
     /** Chemins mentionnés, dans l'ordre et sans doublon. */
     fun find(text: String): List<String> = token.findAll(text).map { it.groupValues[1] }.distinct().toList()
 
+    /**
+     * Chemin absolu normalisé d'une mention. Avec [projectOnly] (message venu du téléphone), une mention qui sort du
+     * projet (chemin absolu ailleurs, `..`) est refusée : null. Sinon tout chemin est accepté (saisie dans l'IDE).
+     */
+    fun resolve(rel: String, cwd: String, projectOnly: Boolean): String? {
+        val base = java.nio.file.Path.of(cwd).toAbsolutePath().normalize()
+        val p = runCatching { base.resolve(rel).normalize() }.getOrNull() ?: return null
+        return p.toString().takeIf { !projectOnly || p.startsWith(base) }
+    }
+
     /** Jeton `@xxx` en cours de frappe juste avant le curseur : (début, requête) ou null. */
     fun activeToken(text: String, caret: Int): Pair<Int, String>? {
         val before = text.substring(0, caret.coerceIn(0, text.length))
