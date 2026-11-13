@@ -2,6 +2,8 @@
 
 ## Non publié
 
+- **Confirmation avant d'interrompre Claude** : fermer l'onglet, démarrer une nouvelle conversation ou charger une autre session pendant qu'il répond demande confirmation (et prévient des messages en attente qui seraient perdus)
+- **Icône « recommencer »** pour la nouvelle conversation de l'onglet, avec une info-bulle explicite : le « + » reste réservé au nouvel onglet
 - **Durée de la réponse** : la barre de statut affiche « réponse en 1 min 23 s » une fois la réponse terminée (elle ne reste plus figée sur « Réponse en cours »)
 - **Historique de saisie** : ↑ sur la première ligne du champ rappelle les messages envoyés, ↓ sur la dernière redescend jusqu'au brouillon
 - **Liens vers les images** : les chemins d'images cités dans les réponses (hors blocs de code) s'ouvrent dans l'éditeur s'ils existent
