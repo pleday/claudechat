@@ -364,25 +364,25 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                 ?: ProbeResult(null, err.toString().trim().ifEmpty { "la CLI n'a fourni aucune information de quota (compte API, proxy ou version sans cette donnée ?)" })
         } catch (e: Exception) { ProbeResult(null, "impossible de lancer la CLI : ${e.message}") }
 
+        private fun controlRequest(id: String, subtype: String) = JsonObject().apply {
+            addProperty("type", "control_request"); addProperty("request_id", id)
+            add("request", JsonObject().apply { addProperty("subtype", subtype) })
+        }
+
         /**
-         * Liste les commandes slash disponibles via la requête de contrôle `initialize` : aucun message n'est envoyé,
-         * donc aucun appel au modèle. Bloquant ; liste vide en cas d'échec.
+         * Lance un processus `claude` à part, lui envoie une seule requête de contrôle (aucun message : aucun appel au
+         * modèle) et renvoie sa réponse complète ; null en cas d'échec ou de délai dépassé. Bloquant.
          */
-        fun listCommands(cli: String, cwd: String, timeoutSec: Long = 20): List<CliCommand> = try {
-            val cmd = listOf(cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence") + NO_MCP
-            val p = ProcessBuilder(cmd).directory(java.io.File(cwd)).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+        private fun controlOnce(args: List<String>, cwd: String, id: String, subtype: String, timeoutSec: Long): JsonObject? = try {
+            val p = ProcessBuilder(args).directory(java.io.File(cwd)).redirectError(ProcessBuilder.Redirect.DISCARD).start()
             val w = p.outputStream.bufferedWriter()
-            w.write(JsonObject().apply {
-                addProperty("type", "control_request"); addProperty("request_id", "init-cmds")
-                add("request", JsonObject().apply { addProperty("subtype", "initialize") })
-            }.toString())
-            w.newLine(); w.flush()
-            var res: List<CliCommand> = emptyList()
+            w.write(controlRequest(id, subtype).toString()); w.newLine(); w.flush()
+            var res: JsonObject? = null
             val reader = Thread {
                 p.inputStream.bufferedReader().useLines { lines ->
                     for (line in lines) {
-                        if (!line.startsWith("{") || !line.contains("init-cmds")) continue
-                        res = parseCommands(runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: continue)
+                        if (!line.startsWith("{") || !line.contains("\"$id\"")) continue
+                        res = runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: continue
                         break
                     }
                 }
@@ -391,7 +391,21 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
             runCatching { w.close() }
             p.destroy()
             res
-        } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) { null }
+
+        private fun baseArgs(cli: String) =
+            listOf(cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence")
+
+        /**
+         * Commandes slash et modèles annoncés par la CLI (requête `initialize`, sans appel au modèle). Bloquant ;
+         * listes vides en cas d'échec.
+         */
+        fun fetchInit(cli: String, cwd: String, timeoutSec: Long = 20): CliInit {
+            val j = controlOnce(baseArgs(cli) + NO_MCP, cwd, "init-cmds", "initialize", timeoutSec) ?: return CliInit(emptyList(), emptyList())
+            return CliInit(parseCommands(j), parseModels(j))
+        }
+
+        fun listCommands(cli: String, cwd: String, timeoutSec: Long = 20): List<CliCommand> = fetchInit(cli, cwd, timeoutSec).commands
 
         /** Extrait les commandes d'une réponse `initialize` ; vide si le format est inattendu. */
         fun parseCommands(j: JsonObject): List<CliCommand> {

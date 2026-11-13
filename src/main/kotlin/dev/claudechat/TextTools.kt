@@ -110,18 +110,49 @@ fun describeTool(name: String, i: JsonObject): String {
     }
 }
 
-/** Catalogue des modèles avec leur numéro de version (FR-62). */
+/**
+ * Catalogue des modèles (FR-62). Les modèles viennent de la CLI (réponse `initialize`, voir [update]) : nouveaux modèles,
+ * noms et niveaux d'effort pris en charge sont ainsi toujours à jour. La liste figée ne sert que de secours
+ * tant que la CLI n'a pas répondu (ou si elle est injoignable).
+ */
 object ModelCatalog {
-    val known = listOf(
+    private val fallback = listOf(
         "claude-fable-5-2" to "Fable 5.2",
         "claude-opus-5-5" to "Opus 5.5",
         "claude-sonnet-5-5" to "Sonnet 5.5",
         "claude-haiku-5-5" to "Haiku 5.5",
     )
-    private val aliases = mapOf("fable" to "claude-fable-5-2", "opus" to "claude-opus-5-5", "sonnet" to "claude-sonnet-5-5", "haiku" to "claude-haiku-5-5")
+    private val fallbackAliases = mapOf("fable" to "claude-fable-5-2", "opus" to "claude-opus-5-5", "sonnet" to "claude-sonnet-5-5", "haiku" to "claude-haiku-5-5")
+
+    @Volatile private var fromCli: List<CliModel> = emptyList()
+
+    /** Retient les modèles annoncés par la CLI ; une liste vide (CLI muette) ne remplace pas la précédente. */
+    fun update(models: List<CliModel>) { if (models.isNotEmpty()) fromCli = models }
+
+    internal fun reset() { fromCli = emptyList() }
+
+    /** Modèles annoncés par la CLI ; vide tant qu'elle n'a pas répondu. */
+    fun all(): List<CliModel> = fromCli
+
+    /** (identifiant, nom) : ceux de la CLI, sinon la liste de secours. */
+    val known: List<Pair<String, String>> get() = fromCli.map { it.id to it.name }.ifEmpty { fallback }
+
+    fun description(id: String): String? = fromCli.firstOrNull { it.id == id }?.description?.takeIf { it.isNotBlank() }
+
+    /**
+     * Niveaux d'effort proposés pour [id] : « auto » puis ceux que le modèle accepte ; seulement « auto » s'il n'en
+     * accepte aucun. Modèle inconnu de la CLI (personnalisé, CLI muette) : [fallbackLevels], sans restriction.
+     */
+    fun effortChoices(id: String, fallbackLevels: List<String>): List<String> {
+        val m = fromCli.firstOrNull { it.id == id } ?: return fallbackLevels
+        return listOf("auto") + m.efforts
+    }
 
     /** Alias (« sonnet ») -> identifiant complet ; inchangé sinon. */
-    fun resolve(m: String): String = aliases[m.trim().lowercase()] ?: m.trim()
+    fun resolve(m: String): String {
+        val key = m.trim()
+        return fromCli.firstOrNull { it.alias.equals(key, ignoreCase = true) }?.id ?: fallbackAliases[key.lowercase()] ?: key
+    }
 
     /** « Sonnet 5.5 » pour un identifiant connu, sinon déduit de claude-<famille>-<x>-<y>[-date], sinon l'identifiant brut. */
     fun label(id: String): String {

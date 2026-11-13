@@ -333,14 +333,42 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         popupOf(g, anchor)
     }
 
+    /** Efforts proposés pour le modèle choisi : ceux qu'il accepte (annoncés par la CLI), sinon la liste générale. */
+    private fun effortChoices(model: String) = ModelCatalog.effortChoices(model, EFFORTS)
+
+    private fun selectModel(id: String) {
+        selectedModel = id
+        // un effort que le nouveau modèle n'accepte pas ferait échouer la CLI : retour à « auto »
+        if (selectedEffort !in effortChoices(id)) selectedEffort = "auto"
+        refreshModelButton(); saveChoices()
+    }
+
     private fun showModelMenu(anchor: java.awt.Component) {
         val g = DefaultActionGroup()
-        g.addSeparator("Modèle")
-        (settings.models() + selectedModel).distinct().forEach { id ->
-            g.add(choice(ModelCatalog.label(id), id, { selectedModel == id }) { selectedModel = id; refreshModelButton(); saveChoices() })
+        fun item(id: String) {
+            val desc = ModelCatalog.description(id)
+            g.add(choice(ModelCatalog.label(id), if (desc != null) "$desc ($id)" else id, { selectedModel == id }) { selectModel(id) })
         }
-        g.addSeparator("Effort")
-        EFFORTS.forEach { e -> g.add(choice(e, null, { selectedEffort == e }) { selectedEffort = e; refreshModelButton(); saveChoices() }) }
+        val fromCli = ModelCatalog.all()
+        if (fromCli.isEmpty()) {
+            g.addSeparator("Modèle")
+            (settings.models() + selectedModel).distinct().forEach(::item)
+        } else {
+            g.addSeparator("Modèle")
+            fromCli.filter { it.isAlias }.forEach { item(it.id) }
+            val listed = fromCli.map { it.id }.toSet()
+            // modèles personnalisés (réglages) et modèle courant s'il n'est pas annoncé par la CLI
+            (settings.models() + selectedModel).distinct().filter { it !in listed }.forEach(::item)
+            val others = fromCli.filterNot { it.isAlias }
+            if (others.isNotEmpty()) { g.addSeparator("Autres versions"); others.forEach { item(it.id) } }
+        }
+        val efforts = effortChoices(selectedModel)
+        if (efforts.size > 1) {
+            g.addSeparator("Effort")
+            efforts.forEach { e -> g.add(choice(e, null, { selectedEffort == e }) { selectedEffort = e; refreshModelButton(); saveChoices() }) }
+        } else if (ModelCatalog.all().isNotEmpty()) {
+            g.addSeparator("Effort : non pris en charge par ce modèle")
+        }
         popupOf(g, anchor, right = true)
     }
 
@@ -481,8 +509,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         installPasteInterceptor(parent)
         // commandes slash de la CLI, chargées dès l'ouverture pour être proposées dès la première saisie
         ApplicationManager.getApplication().executeOnPooledThread {
-            val list = CliTurn.listCommands(settings.cliPath(), cwd)
-            if (list.isNotEmpty()) cliCommands = list
+            val info = CliTurn.fetchInit(settings.cliPath(), cwd)
+            if (info.commands.isNotEmpty()) cliCommands = info.commands
+            if (info.models.isNotEmpty()) {
+                ModelCatalog.update(info.models)
+                ApplicationManager.getApplication().invokeLater({ refreshModelButton() }, ModalityState.any())
+            }
         }
     }
     @Volatile private var cliCommands: List<CliCommand> = emptyList()
@@ -696,7 +728,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val fork = forkNext
         forkNext = false
         val opts = TurnOptions(
-            settings.cliPath(), cwd, model, selectedEffort, currentMode(),
+            settings.cliPath(), cwd, model, effortChoices(model).let { if (selectedEffort in it) selectedEffort else "auto" }, currentMode(),
             session.id, settings.state.system, emptyList(), fork, waitForMcp = true,
         )
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -849,7 +881,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val icon = BatteryIcon(remaining)
         batteryLabel.icon = icon
         batteryLabel.text = remaining?.let { "$it %" } ?: "?"
-        batteryLabel.toolTipText = (remaining?.let { "Session de 5 h : $it % restant" } ?: "Session de 5 h : pas encore mesurée") + " — cliquer pour le détail"
+        batteryLabel.toolTipText = (remaining?.let { "Session de 5 h : $it % restant" } ?: "Session de 5 h : pas encore mesurée") + ""
         content?.icon = icon
     }
 

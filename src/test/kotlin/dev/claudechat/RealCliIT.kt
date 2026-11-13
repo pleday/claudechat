@@ -96,4 +96,16 @@ class RealCliIT {
         assertFalse(err)
         assertTrue(out.isNotBlank(), "Claude doit répondre")
     }
+
+    /** Requête `initialize` : aucun appel au modèle, donc aucun quota consommé. */
+    @Test fun realInitListsCommandsAndModelsWithEfforts() {
+        val info = CliTurn.fetchInit(ClaudeSettings.defaultCli(), System.getProperty("java.io.tmpdir"))
+        println("MODELS: ${info.models.map { "${it.alias}=${it.id}${it.efforts}" }}")
+        assertTrue(info.commands.isNotEmpty(), "aucune commande")
+        assertTrue(info.models.isNotEmpty(), "aucun modèle")
+        assertTrue(info.models.none { it.alias == "default" })
+        assertTrue(info.models.all { it.id.startsWith("claude-") }, "identifiants résolus attendus")
+        assertTrue(info.models.any { it.isAlias && it.efforts.isNotEmpty() })
+    }
+
 }

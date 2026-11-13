@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **Modèles et niveaux d'effort lus depuis la CLI** : le menu du modèle propose ceux que la CLI annonce (nouveaux modèles, noms, descriptions en info-bulle, versions précédentes regroupées à part), et seuls les efforts acceptés par le modèle choisi sont proposés ; la liste figée ne sert plus que de secours
 - **Confirmation avant d'interrompre Claude** : fermer l'onglet, démarrer une nouvelle conversation ou charger une autre session pendant qu'il répond demande confirmation (et prévient des messages en attente qui seraient perdus)
 - **Icône « recommencer »** pour la nouvelle conversation de l'onglet, avec une info-bulle explicite : le « + » reste réservé au nouvel onglet
 - **Durée de la réponse** : la barre de statut affiche « réponse en 1 min 23 s » une fois la réponse terminée (elle ne reste plus figée sur « Réponse en cours »)
