@@ -1,28 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.0/claude-chat-0.9.0.zip" version="0.9.0">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.1/claude-chat-0.9.1.zip" version="0.9.1">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Haut de la zone de saisie plus compact</b> : les fichiers modifiés par Claude et la suggestion du message suivant tiennent sur une seule rangée de pastilles alignées à gauche (même style que les pièces jointes), au lieu de deux lignes centrées empilées ; chaque pastille a sa croix (oublier les modifications, ignorer la suggestion)</li>
-<li><b>Fichiers modifiés par Claude</b> : une ligne au-dessus du champ de saisie (et un bouton de la barre d'outils) indique combien de fichiers Claude a modifiés dans la conversation (+lignes ajoutées −retirées) ; un clic ouvre l'arbre des changements de l'IDE, dont chaque fichier s'ouvre dans l'outil de comparaison de l'IDE (état avant Claude contre état actuel, navigation d'un fichier au suivant). Sont comptés les fichiers modifiés directement par Claude comme ceux touchés par une commande (Bash, sous-agent, outil MCP) ; rien ne dépend de git (commit automatique, fichier non versionné ou ignoré : sans effet) et vos propres modifications n'apparaissent pas</li>
-<li><b>Titres de session à jour</b> : l'onglet prend le titre généré par la CLI quelques secondes après la réponse (au lieu de garder le début du premier message jusqu'au rechargement) ; un titre donné côté CLI (<code>/rename</code>, <code>--name</code>) est repris dans la liste des sessions, et renommer un onglet renomme aussi la session côté CLI (visible dans <code>claude --resume</code>)</li>
-<li><b>Suggestion du message suivant</b> : après une réponse, la CLI propose ce que vous écrirez probablement ensuite ; une ligne au-dessus du champ de saisie l'affiche, un clic (ou Tab dans le champ vide) l'insère. Désactivable dans les réglages (une petite requête en plus par réponse, environ 10 % de coût)</li>
-<li><b>Mode de permission appliqué tout de suite</b> : changer le mode (Demander, Modifs auto, Plan…) pendant que Claude travaille prend effet immédiatement, sans attendre le message suivant (sauf « Tout autoriser », que la CLI n'autorise pas en cours de session)</li>
-<li><b>Votre message épinglé en haut</b> : une ligne discrète reste visible au-dessus de la conversation, un clic l'affiche en entier. Si votre dernier message ne fait que demander de reprendre (« continue », « reprends là où tu t'étais arrêté », « recommence »…), c'est le message précédent, celui qui contient la tâche, qui est épinglé (repéré par ↻)</li>
-<li><b>Détail du contexte</b> : un clic sur l'anneau de contexte affiche la répartition mesurée par la CLI (prompt système, outils, skills, messages…, détail des messages, seuil de compaction automatique). Mesure exacte via le processus de la conversation, sinon estimation hors serveurs MCP</li>
-<li><b>Modèles et niveaux d'effort lus depuis la CLI</b> : le menu du modèle propose ceux que la CLI annonce (nouveaux modèles, noms, descriptions en info-bulle, versions précédentes regroupées à part), et seuls les efforts acceptés par le modèle choisi sont proposés ; la liste figée ne sert plus que de secours</li>
-<li><b>Confirmation avant d'interrompre Claude</b> : fermer l'onglet, démarrer une nouvelle conversation ou charger une autre session pendant qu'il répond demande confirmation (et prévient des messages en attente qui seraient perdus)</li>
-<li><b>Icône « recommencer »</b> pour la nouvelle conversation de l'onglet, avec une info-bulle explicite : le « + » reste réservé au nouvel onglet</li>
-<li><b>Durée de la réponse</b> : la barre de statut affiche « réponse en 1 min 23 s » une fois la réponse terminée (elle ne reste plus figée sur « Réponse en cours »)</li>
-<li><b>Historique de saisie</b> : ↑ sur la première ligne du champ rappelle les messages envoyés, ↓ sur la dernière redescend jusqu'au brouillon</li>
-<li><b>Liens vers les images</b> : les chemins d'images cités dans les réponses (hors blocs de code) s'ouvrent dans l'éditeur s'ils existent</li>
-<li><b>Rendu plus fluide</b> : le HTML de chaque message est mis en cache, seule la réponse en cours est recalculée ; l'existence des fichiers cités est mise en cache, le rafraîchissement des fichiers modifiés par Claude est regroupé (et ciblé sur le fichier édité), la recherche <code>@</code> est débouncée et hors du thread de l'IDE</li>
-<li><b>Liste des sessions plus rapide</b> : titres mis en cache, une seule lecture de date par fichier ; <code>session-meta.json</code> est écrit de façon atomique et lu sans planter s'il est incomplet</li>
-<li><b>Accès à distance</b> : le code d'appairage expire après 5 minutes et est révoqué après 5 essais erronés ; une mention <code>@</code> reçue du téléphone ne peut plus joindre un fichier hors du projet</li>
-<li>Un événement illisible de la CLI est ignoré (et journalisé) au lieu d'interrompre toute la réponse</li>
-<li>Intégration continue GitHub et <code>make compat</code> (vérification de compatibilité avec les IDE récents)</li>
+<li><b>Message épinglé</b> : une fois déplié, sa première ligne n'apparaît plus deux fois (le libellé affiche « Votre message », le texte complet est en dessous)</li>
+<li><b>Constantes et prompts communs</b> avec l'extension VS Code (modes de permission, prompts <code>/explain</code>, <code>/fix</code>…, seuils) lus depuis une source unique, et vecteurs de test partagés entre les deux projets ; le délai de péremption de la mesure des quotas reste de 30 min</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
