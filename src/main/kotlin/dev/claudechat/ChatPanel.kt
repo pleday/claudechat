@@ -216,7 +216,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     /** Rond orange avec flèche (envoyer) ou carré (interrompre) ; le menu mémorise « file d'attente » ou « préciser ». */
     private fun syncSend() {
-        val blank = input.text.isBlank()
+        val blank = input.text.isBlank() && extraFiles.isEmpty() && extraImages.isEmpty()
         val menu = listOf(
             SplitItem("Mettre en file d'attente", AllIcons.Actions.MoveDown, "Envoyé quand la réponse en cours est terminée", busyMode == SendMode.QUEUE) { setBusyMode(SendMode.QUEUE) },
             SplitItem("Préciser l'exécution en cours", AllIcons.Actions.Lightning, "Injecté dans la réponse en cours, sans l'interrompre", busyMode == SendMode.REFINE) { setBusyMode(SendMode.REFINE) },
@@ -532,7 +532,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun send(mode: SendMode = busyMode) {
         val original = input.text.trim()
-        if (original.isEmpty()) return
+        if (original.isEmpty() && extraFiles.isEmpty() && extraImages.isEmpty()) return
         input.text = ""
         if (streaming) {
             if (mode == SendMode.REFINE) refine(original) else { queue.add(original); updateQueue() }
@@ -579,14 +579,15 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                 add("source", JsonObject().apply { addProperty("type", "base64"); addProperty("media_type", media); addProperty("data", b64) })
             })
         }
+        val body = (files.map { it.second } + text).filter { it.isNotBlank() }.joinToString("\n\n")
         content.add(JsonObject().apply {
             addProperty("type", "text")
-            addProperty("text", (files.map { it.second } + text).joinToString("\n\n"))
+            addProperty("text", body.ifBlank { "(pièce jointe)" })
         })
         val attached = (files.map { it.first } + images.map { it.first }).takeIf { it.isNotEmpty() }?.joinToString(", ")
         session.entries.add(Entry(Kind.USER, text, attached = attached))
         if (session.entries.count { it.kind == Kind.USER } == 1) {
-            session.title = original.lineSequence().first { it.isNotBlank() }.take(60)
+            session.title = (original.lineSequence().firstOrNull { it.isNotBlank() } ?: attached ?: "Pièce jointe").take(60)
         }
         startTurn(content)
     }
@@ -1075,6 +1076,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             })
         }
         extrasStrip.revalidate(); extrasStrip.repaint(); extrasRow.revalidate()
+        syncSend()
     }
 
     private fun attachmentChip(icon: Icon?, text: String, tip: String, onClick: (() -> Unit)?, onRemove: () -> Unit): JComponent {
