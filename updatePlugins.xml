@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.8.1/claude-chat-0.8.1.zip" version="0.8.1">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.8.2/claude-chat-0.8.2.zip" version="0.8.2">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Permissions « Stream closed » (suite)</b> : la CLI peut reprendre du travail après un <code>result</code> (tâche de fond, message empilé). Le plugin garde alors l'entrée ouverte (fermeture seulement après 3 min de silence), repasse en « en cours » et affiche normalement les demandes de permission, au lieu de les perdre. Le processus d'un tour terminé est arrêté dès qu'un nouveau message est envoyé</li>
+<li><b>Serveurs MCP prêts avant l'envoi</b> : la CLI démarre ses serveurs MCP en tâche de fond, et au premier message ceux encore « pending » n'avaient pas d'outils (Claude les croyait déconnectés, par exemple SonarQube). Le plugin attend maintenant leur connexion (15 s max, requête <code>mcp_status</code>) avant d'envoyer, et affiche une notice si un serveur est en échec ou toujours en attente</li>
+<li>Les processus utilitaires (liste des commandes <code>/</code>, mesure du quota) ne démarrent plus les serveurs MCP de l'utilisateur</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
