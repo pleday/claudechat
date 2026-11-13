@@ -24,6 +24,7 @@ class RemoteHubTest {
     private var updateId = 1
     private lateinit var hub: RemoteHub
     private val paired = LinkedBlockingQueue<Long>()
+    @Volatile private var clockMs = 0L
 
     @BeforeEach fun setUp() {
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -49,7 +50,7 @@ class RemoteHubTest {
         }
         server.start()
         hub = RemoteHub()
-        hub.bot = TelegramBot("TOK", 42L, hub, "http://127.0.0.1:${server.address.port}", pollTimeoutSec = 0)
+        hub.bot = TelegramBot("TOK", 42L, hub, "http://127.0.0.1:${server.address.port}", pollTimeoutSec = 0, clock = { clockMs })
         hub.onPairedCallback = { paired.add(it) }
         hub.start()
     }
@@ -144,6 +145,30 @@ class RemoteHubTest {
         assertEquals(7L, paired.poll(5, TimeUnit.SECONDS))
         assertEquals(7L, hub.bot.chatId)
         assertNull(hub.bot.pairingCode, "code à usage unique")
+    }
+
+    @Test fun pairingCodeExpiresAfterFiveMinutes() {
+        hub.bot.chatId = null
+        hub.bot.pairingCode = "123456"
+        clockMs += 5 * 60_000L + 1
+        updates.add(msg(7, "/pair 123456"))
+        await { sent.isNotEmpty() }
+        assertTrue("expiré" in sent.last()["text"].asString)
+        assertNull(paired.poll(300, TimeUnit.MILLISECONDS))
+        assertNull(hub.bot.chatId)
+        assertNull(hub.bot.pairingCode)
+    }
+
+    @Test fun pairingCodeIsRevokedAfterTooManyWrongAttempts() {
+        hub.bot.chatId = null
+        hub.bot.pairingCode = "123456"
+        repeat(5) { updates.add(msg(7, "/pair 00000$it")) }
+        await { sent.size >= 5 }
+        assertNull(hub.bot.pairingCode)
+        updates.add(msg(7, "/pair 123456"))
+        await { sent.size >= 6 }
+        assertNull(paired.poll(300, TimeUnit.MILLISECONDS), "le bon code ne doit plus fonctionner")
+        assertNull(hub.bot.chatId)
     }
 
     @Test fun noOfferWhenUnpaired() {

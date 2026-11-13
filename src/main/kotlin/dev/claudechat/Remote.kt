@@ -20,6 +20,7 @@ class TelegramBot(
     private val handler: Handler,
     private val baseUrl: String = "https://api.telegram.org",
     private val pollTimeoutSec: Int = 25,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
     interface Handler {
         fun onCallback(data: String)
@@ -27,8 +28,15 @@ class TelegramBot(
         fun onPaired(chatId: Long)
     }
 
-    /** Code d'appairage à usage unique : le message `/pair <code>` du téléphone enregistre son chat. */
+    /**
+     * Code d'appairage à usage unique : le message `/pair <code>` du téléphone enregistre son chat.
+     * Il expire après [PAIRING_TTL_MS] et est révoqué après [MAX_PAIRING_FAILURES] essais erronés
+     * (6 chiffres seulement : sans cela, quiconque connaît le bot pourrait les tester tous).
+     */
     @Volatile var pairingCode: String? = null
+        set(v) { field = v; pairingFailures = 0; pairingExpiresAt = clock() + PAIRING_TTL_MS }
+    @Volatile private var pairingExpiresAt = 0L
+    @Volatile private var pairingFailures = 0
 
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
     @Volatile private var running = false
@@ -98,6 +106,11 @@ class TelegramBot(
         }
     }
 
+    private companion object {
+        const val PAIRING_TTL_MS = 5 * 60_000L
+        const val MAX_PAIRING_FAILURES = 5
+    }
+
     private fun handle(u: JsonObject) {
         u["callback_query"]?.asJsonObject?.let { cq ->
             val chat = cq["message"]?.asJsonObject?.get("chat")?.asJsonObject?.get("id")?.asLong
@@ -109,13 +122,19 @@ class TelegramBot(
         val msg = u["message"]?.asJsonObject ?: return
         val chat = msg["chat"].asJsonObject["id"].asLong
         val text = msg["text"]?.asString ?: return
-        val code = pairingCode
         if (text.startsWith("/pair")) {
-            if (code != null && text.removePrefix("/pair").trim() == code) {
+            val code = pairingCode
+            if (code != null && clock() > pairingExpiresAt) pairingCode = null
+            val live = pairingCode
+            val given = text.removePrefix("/pair").trim()
+            if (live != null && java.security.MessageDigest.isEqual(live.toByteArray(), given.toByteArray())) {
                 pairingCode = null; chatId = chat
                 handler.onPaired(chat)
                 send("✅ Appairé avec Claude Chat. Les demandes d'approbation et questions arriveront ici.", to = chat)
-            } else send("Code d'appairage invalide ou expiré.", to = chat)
+            } else {
+                if (live != null && ++pairingFailures >= MAX_PAIRING_FAILURES) pairingCode = null
+                send("Code d'appairage invalide ou expiré.", to = chat)
+            }
             return
         }
         if (chat == chatId) handler.onText(text, msg["reply_to_message"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("message_id")?.asInt)

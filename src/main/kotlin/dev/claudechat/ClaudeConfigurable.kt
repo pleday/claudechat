@@ -108,7 +108,7 @@ class ClaudeConfigurable : BoundConfigurable("Claude Chat") {
                         ApplicationManager.getApplication().invokeLater({
                             if (code == null) com.intellij.openapi.ui.Messages.showErrorDialog("Active l'accès à distance et renseigne le jeton du bot.", "Appairage")
                             else com.intellij.openapi.ui.Messages.showInfoMessage(
-                                "Dans Telegram, ouvre ton bot et envoie :\n\n/pair $code\n\nPuis rouvre ces réglages pour voir le chat appairé.", "Appairage")
+                                "Dans Telegram, ouvre ton bot et envoie :\n\n/pair $code\n\n(valable 5 minutes)\n\nPuis rouvre ces réglages pour voir le chat appairé.", "Appairage")
                         }, ModalityState.any())
                     }
                 }
