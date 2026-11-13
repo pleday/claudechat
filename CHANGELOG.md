@@ -1,5 +1,15 @@
 # Changelog
 
+## Non publié
+
+- **Historique de saisie** : ↑ sur la première ligne du champ rappelle les messages envoyés, ↓ sur la dernière redescend jusqu'au brouillon
+- **Liens vers les images** : les chemins d'images cités dans les réponses (hors blocs de code) s'ouvrent dans l'éditeur s'ils existent
+- **Rendu plus fluide** : le HTML de chaque message est mis en cache, seule la réponse en cours est recalculée ; l'existence des fichiers cités est mise en cache, le rafraîchissement des fichiers modifiés par Claude est regroupé (et ciblé sur le fichier édité), la recherche `@` est débouncée et hors du thread de l'IDE
+- **Liste des sessions plus rapide** : titres mis en cache, une seule lecture de date par fichier ; `session-meta.json` est écrit de façon atomique et lu sans planter s'il est incomplet
+- **Accès à distance** : le code d'appairage expire après 5 minutes et est révoqué après 5 essais erronés ; une mention `@` reçue du téléphone ne peut plus joindre un fichier hors du projet
+- Un événement illisible de la CLI est ignoré (et journalisé) au lieu d'interrompre toute la réponse
+- Intégration continue GitHub et `make compat` (vérification de compatibilité avec les IDE récents)
+
 ## 0.8.4
 
 - **Pièce jointe seule** : une image ou un fichier joint suffit pour envoyer un message (le bouton d'envoi s'active sans texte)
