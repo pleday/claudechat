@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.8.2/claude-chat-0.8.2.zip" version="0.8.2">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.8.3/claude-chat-0.8.3.zip" version="0.8.3">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Serveurs MCP prêts avant l'envoi</b> : la CLI démarre ses serveurs MCP en tâche de fond, et au premier message ceux encore « pending » n'avaient pas d'outils (Claude les croyait déconnectés, par exemple SonarQube). Le plugin attend maintenant leur connexion (15 s max, requête <code>mcp_status</code>) avant d'envoyer, et affiche une notice si un serveur est en échec ou toujours en attente</li>
-<li>Les processus utilitaires (liste des commandes <code>/</code>, mesure du quota) ne démarrent plus les serveurs MCP de l'utilisateur</li>
+<li><b>Collage d'images</b> : Ctrl+V / Maj+Inser et le glisser-déposer passent maintenant par un <code>TransferHandler</code> et un raccourci dédiés (le collage ne passait pas par <code>paste()</code> dans l'IDE) ; les fichiers copiés depuis un gestionnaire de fichiers sont aussi joints. Du texte copié avec une image (tableur, page web) reste collé comme texte</li>
+<li>Ctrl+V / Maj+Inser sont interceptés au niveau de la file d'événements de l'IDE quand le champ de saisie a le focus : l'IDE les traitait avant le composant, d'où le collage d'image qui ne faisait rien</li>
+<li>Collage d'image sous Wayland : si <code>imageFlavor</code> n'est pas fourni, l'image est lue depuis les formats <code>image/png</code>, <code>image/jpeg</code>… du presse-papiers ; les formats disponibles sont journalisés (« Collage (…) : formats du presse-papiers ») pour le diagnostic</li>
+<li><b>Aperçu des pièces jointes</b> : miniatures des images (clic pour agrandir), pastilles pour les fichiers, retrait pièce par pièce (×) au lieu de la simple liste de noms</li>
+<li>Suppression de la case « Autoriser la télémétrie » des réglages : elle n'était lue par aucun code et ne déclenchait aucun envoi</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
