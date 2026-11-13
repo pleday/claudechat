@@ -1575,6 +1575,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val sb = StringBuilder()
         sb.append("<html><head><style>")
         sb.append("body{font-family:'${font.family}';font-size:${font.size}pt;color:${hex(fg)};}")
+        sb.append("td.cb{background-color:${hex(codeBg)};padding:6px;}")
         sb.append("pre{background-color:${hex(codeBg)};padding:6px;}")
         sb.append("code,pre{font-family:'$codeFont';font-size:${font.size - 1}pt;}")
         sb.append("a{color:${hex(link)};}")
