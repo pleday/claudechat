@@ -160,10 +160,8 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
     private fun read(p: Process) {
         var finished = false
         try {
-            p.inputStream.bufferedReader().forEachLine { line ->
-                lastActivity = System.nanoTime()
-                if (!line.startsWith("{")) return@forEachLine
-                val j = runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: return@forEachLine
+            // un événement illisible est ignoré et journalisé : il ne doit pas interrompre toute la réponse
+            fun handle(j: JsonObject) {
                 if (ended && j["type"]?.asString in RESUME_EVENTS) {
                     // la CLI continue après un `result` : on garde l'entrée ouverte et on repasse en « en cours »
                     LOG.info("Activité « ${j["type"]?.asString} » après un result : tour repris")
@@ -220,6 +218,12 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                         closeInputWhenQuiet()
                     }
                 }
+            }
+            p.inputStream.bufferedReader().forEachLine { line ->
+                lastActivity = System.nanoTime()
+                if (!line.startsWith("{")) return@forEachLine
+                val j = runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: return@forEachLine
+                try { handle(j) } catch (e: Exception) { LOG.warn("Événement de la CLI ignoré (${e.javaClass.simpleName}: ${e.message}) : ${line.take(200)}") }
             }
         } catch (_: Exception) {}
         p.waitFor(5, TimeUnit.SECONDS)

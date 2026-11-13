@@ -69,6 +69,18 @@ echo '{"type":"result","is_error":false,"total_cost_usd":0.5,"usage":{"input_tok
         )
     }
 
+    @Test fun malformedEventIsSkippedAndStreamContinues() {
+        val cli = fake("""
+read -r line
+echo '{"type":"system","subtype":"init"}'
+echo '{"type":"stream_event"}'
+echo '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}}'
+echo '{"type":"result","is_error":false}'
+""")
+        val (rec, _) = run(cli)
+        assertEquals(listOf("text:ok", "usage:0/0/0.0", "done:false:"), rec.events.toList())
+    }
+
     @Test fun keepsInputOpenAndResumesAfterResult() {
         val out = tmp.resolve("after.txt")
         // 1er result, puis la CLI reprend (tâche de fond) et demande une permission ; la réponse doit lui parvenir
