@@ -60,7 +60,10 @@ import java.nio.file.Path
 import java.util.Base64
 import javax.swing.AbstractAction
 import javax.swing.BoxLayout
+import javax.swing.BorderFactory
 import javax.swing.Icon
+import javax.swing.JComponent
+import javax.swing.SwingConstants
 import javax.swing.JButton
 import javax.swing.JEditorPane
 import javax.swing.JPanel
@@ -143,9 +146,28 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     private val input = object : JBTextArea(3, 20) {
         override fun paste() {
-            if (!pasteImage()) super.paste()
+            if (!pasteFromClipboard()) super.paste()
         }
     }.apply {
+        lineWrap = true
+        // Ctrl+V est souvent traité par l'IDE / le TransferHandler sans passer par paste() : on intercepte aussi ces chemins
+        val mask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+        for (k in listOf(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V, mask), KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_INSERT, java.awt.event.InputEvent.SHIFT_DOWN_MASK))) {
+            inputMap.put(k, "claude-paste")
+        }
+        actionMap.put("claude-paste", object : AbstractAction() {
+            override fun actionPerformed(e: ActionEvent?) = paste()
+        })
+        val textHandler = transferHandler
+        transferHandler = object : javax.swing.TransferHandler() {
+            private fun ours(f: Array<out java.awt.datatransfer.DataFlavor>) =
+                f.any { it == java.awt.datatransfer.DataFlavor.imageFlavor || it == java.awt.datatransfer.DataFlavor.javaFileListFlavor }
+            override fun canImport(c: javax.swing.JComponent, f: Array<out java.awt.datatransfer.DataFlavor>) = ours(f) || textHandler.canImport(c, f)
+            override fun importData(c: javax.swing.JComponent, t: java.awt.datatransfer.Transferable): Boolean =
+                pasteFromClipboard(t) || textHandler.importData(c, t)
+            override fun getSourceActions(c: javax.swing.JComponent) = textHandler.getSourceActions(c)
+            override fun exportToClipboard(c: javax.swing.JComponent, clip: java.awt.datatransfer.Clipboard, action: Int) = textHandler.exportToClipboard(c, clip, action)
+        }
         lineWrap = true
         wrapStyleWord = true
         emptyText.setText("@ pour les fichiers, / pour les commandes, Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne")
@@ -212,11 +234,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var contextOn = true
     private val extraFiles = mutableListOf<Pair<String, String>>()
     private val extraImages = mutableListOf<Triple<String, String, String>>()
-    private val extrasLabel = JBLabel().apply { foreground = UIUtil.getContextHelpForeground() }
+    private val extrasStrip = JPanel(WrapFlowLayout(FlowLayout.LEFT, 4, 2)).apply { isOpaque = false }
+    private val thumbCache = java.util.IdentityHashMap<Triple<String, String, String>, javax.swing.Icon>()
     private val extrasRow = JPanel(BorderLayout()).apply {
         isVisible = false
         border = JBUI.Borders.empty(0, 6)
-        add(extrasLabel, BorderLayout.CENTER)
+        add(extrasStrip, BorderLayout.CENTER)
         add(ActionLink("effacer").apply { addActionListener { extraFiles.clear(); extraImages.clear(); updateExtras() } }, BorderLayout.EAST)
     }
     private val queueLabel = JBLabel().apply {
@@ -1035,10 +1058,62 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun updateExtras() {
         extrasRow.isVisible = extraFiles.isNotEmpty() || extraImages.isNotEmpty()
-        // une vidéo apparaît une seule fois, avec son nombre d'images (« clip.mp4 ×6 »)
-        val names = extraImages.map { it.first }.groupingBy { it }.eachCount().map { (n, c) -> if (c > 1) "$n ×$c" else n }
-        extrasLabel.text = "Joints : " + (extraFiles.map { it.first.substringAfterLast('/') } + names).distinct().joinToString(", ")
-        extrasRow.revalidate()
+        thumbCache.keys.removeIf { k -> extraImages.none { it === k } }
+        extrasStrip.removeAll()
+        // une vidéo apparaît une seule fois (miniature de sa 1re image, « clip.mp4 ×6 »)
+        val groups = extraImages.groupBy { it.first }
+        extraFiles.map { it.first }.distinct().filter { it.substringAfterLast('/') !in groups }.forEach { rel ->
+            extrasStrip.add(attachmentChip(AllIcons.FileTypes.Any_type, rel.substringAfterLast('/'), rel, null) { extraFiles.removeAll { it.first == rel }; updateExtras() })
+        }
+        groups.forEach { (name, list) ->
+            extrasStrip.add(attachmentChip(thumbnail(list.first()), if (list.size > 1) "$name ×${list.size}" else name, "$name — cliquer pour agrandir",
+                { showImagePreview(list.first()) }) {
+                extraImages.removeAll { it.first == name }
+                extraFiles.removeAll { it.first.substringAfterLast('/') == name }
+                updateExtras()
+            })
+        }
+        extrasStrip.revalidate(); extrasStrip.repaint(); extrasRow.revalidate()
+    }
+
+    private fun attachmentChip(icon: Icon?, text: String, tip: String, onClick: (() -> Unit)?, onRemove: () -> Unit): JComponent {
+        val hand = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        val label = JBLabel(text, icon, SwingConstants.LEFT).apply {
+            toolTipText = tip; iconTextGap = JBUI.scale(5)
+            if (onClick != null) {
+                cursor = hand
+                addMouseListener(object : java.awt.event.MouseAdapter() { override fun mouseClicked(e: java.awt.event.MouseEvent) { onClick() } })
+            }
+        }
+        val remove = JBLabel(AllIcons.Actions.Close).apply {
+            toolTipText = "Retirer"; cursor = hand
+            addMouseListener(object : java.awt.event.MouseAdapter() { override fun mouseClicked(e: java.awt.event.MouseEvent) { onRemove() } })
+        }
+        return JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
+            isOpaque = false
+            border = BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(JBColor.border(), 1, true), JBUI.Borders.empty(2, 4))
+            add(label, BorderLayout.CENTER); add(remove, BorderLayout.EAST)
+        }
+    }
+
+    private fun decodeImage(img: Triple<String, String, String>): java.awt.image.BufferedImage? =
+        runCatching { javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(Base64.getDecoder().decode(img.third))) }.getOrNull()
+
+    private fun scaledIcon(bi: java.awt.image.BufferedImage, maxW: Int, maxH: Int): Icon {
+        val k = minOf(maxW.toDouble() / bi.width, maxH.toDouble() / bi.height, 1.0)
+        val w = (bi.width * k).toInt().coerceAtLeast(1); val h = (bi.height * k).toInt().coerceAtLeast(1)
+        return javax.swing.ImageIcon(bi.getScaledInstance(w, h, java.awt.Image.SCALE_SMOOTH))
+    }
+
+    private fun thumbnail(img: Triple<String, String, String>): Icon? =
+        thumbCache[img] ?: decodeImage(img)?.let { scaledIcon(it, JBUI.scale(56), JBUI.scale(40)) }?.also { thumbCache[img] = it }
+
+    private fun showImagePreview(img: Triple<String, String, String>) {
+        val bi = decodeImage(img) ?: return
+        val label = JBLabel(scaledIcon(bi, JBUI.scale(560), JBUI.scale(420))).apply { border = JBUI.Borders.empty(6) }
+        JBPopupFactory.getInstance().createComponentPopupBuilder(label, null)
+            .setTitle("${img.first} (${bi.width}×${bi.height})").setRequestFocus(true).setCancelOnClickOutside(true).setMovable(true)
+            .createPopup().showInCenterOf(this)
     }
 
     private fun updateQueue() {
@@ -1097,7 +1172,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     private fun addFiles() {
-        FileChooser.chooseFiles(FileChooserDescriptorFactory.createMultipleFilesNoJarsDescriptor(), project, null) { files ->
+        FileChooser.chooseFiles(FileChooserDescriptorFactory.createMultipleFilesNoJarsDescriptor(), project, null) { files -> attachVirtualFiles(files) }
+    }
+
+    private fun attachVirtualFiles(files: Collection<com.intellij.openapi.vfs.VirtualFile>) {
+        run {
             for (vf in files) {
                 if (vf.isDirectory) continue
                 if (VideoTools.isVideo(vf.name)) { attachVideo(vf.path, relPath(vf), vf.name); continue }
@@ -1170,11 +1249,25 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private var pasteCount = 0
 
-    /** FR-12 : colle une image du presse-papiers comme pièce jointe. */
-    private fun pasteImage(): Boolean {
-        val cb = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-        if (!cb.isDataFlavorAvailable(java.awt.datatransfer.DataFlavor.imageFlavor)) return false
-        val img = runCatching { cb.getData(java.awt.datatransfer.DataFlavor.imageFlavor) as? java.awt.Image }.getOrNull() ?: return false
+    /**
+     * FR-12 : colle une image ou des fichiers copiés comme pièces jointes. Renvoie false si le presse-papiers contient
+     * du texte (collage normal) ou rien d'exploitable.
+     */
+    private fun pasteFromClipboard(t: java.awt.datatransfer.Transferable? = null): Boolean {
+        val tr = t ?: runCatching { java.awt.Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull() ?: return false
+        val imageFlavor = java.awt.datatransfer.DataFlavor.imageFlavor
+        val fileFlavor = java.awt.datatransfer.DataFlavor.javaFileListFlavor
+        if (tr.isDataFlavorSupported(fileFlavor)) {
+            val files = (runCatching { tr.getTransferData(fileFlavor) as? List<*> }.getOrNull() ?: emptyList<Any>())
+                .filterIsInstance<java.io.File>()
+                .mapNotNull { LocalFileSystem.getInstance().refreshAndFindFileByIoFile(it) }
+            if (files.isNotEmpty()) { attachVirtualFiles(files); return true }
+        }
+        if (!tr.isDataFlavorSupported(imageFlavor)) return false
+        // du texte copié avec une image (tableur, page web) : c'est le texte qu'on veut coller
+        if (tr.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.stringFlavor) &&
+            runCatching { (tr.getTransferData(java.awt.datatransfer.DataFlavor.stringFlavor) as? String).orEmpty().isNotBlank() }.getOrDefault(false)) return false
+        val img = runCatching { tr.getTransferData(imageFlavor) as? java.awt.Image }.getOrNull() ?: return false
         val w = img.getWidth(null); val h = img.getHeight(null)
         if (w <= 0 || h <= 0) return false
         val bi = java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB)
