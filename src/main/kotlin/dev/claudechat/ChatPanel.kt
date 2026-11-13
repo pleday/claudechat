@@ -146,7 +146,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     private val input = object : JBTextArea(3, 20) {
         override fun paste() {
-            if (!pasteFromClipboard()) super.paste()
+            if (!pasteFromClipboard(null, "paste()")) super.paste()
         }
     }.apply {
         lineWrap = true
@@ -156,7 +156,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             inputMap.put(k, "claude-paste")
         }
         actionMap.put("claude-paste", object : AbstractAction() {
-            override fun actionPerformed(e: ActionEvent?) = paste()
+            override fun actionPerformed(e: ActionEvent?) { LOG.info("Collage : raccourci Ctrl+V"); paste() }
         })
         val textHandler = transferHandler
         transferHandler = object : javax.swing.TransferHandler() {
@@ -164,7 +164,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                 f.any { it == java.awt.datatransfer.DataFlavor.imageFlavor || it == java.awt.datatransfer.DataFlavor.javaFileListFlavor }
             override fun canImport(c: javax.swing.JComponent, f: Array<out java.awt.datatransfer.DataFlavor>) = ours(f) || textHandler.canImport(c, f)
             override fun importData(c: javax.swing.JComponent, t: java.awt.datatransfer.Transferable): Boolean =
-                pasteFromClipboard(t) || textHandler.importData(c, t)
+                pasteFromClipboard(t, "TransferHandler") || textHandler.importData(c, t)
             override fun getSourceActions(c: javax.swing.JComponent) = textHandler.getSourceActions(c)
             override fun exportToClipboard(c: javax.swing.JComponent, clip: java.awt.datatransfer.Clipboard, action: Int) = textHandler.exportToClipboard(c, clip, action)
         }
@@ -1253,30 +1253,52 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
      * FR-12 : colle une image ou des fichiers copiés comme pièces jointes. Renvoie false si le presse-papiers contient
      * du texte (collage normal) ou rien d'exploitable.
      */
-    private fun pasteFromClipboard(t: java.awt.datatransfer.Transferable? = null): Boolean {
+    private fun pasteFromClipboard(t: java.awt.datatransfer.Transferable? = null, via: String = "?"): Boolean {
         val tr = t ?: runCatching { java.awt.Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull() ?: return false
-        val imageFlavor = java.awt.datatransfer.DataFlavor.imageFlavor
         val fileFlavor = java.awt.datatransfer.DataFlavor.javaFileListFlavor
+        val textFlavor = java.awt.datatransfer.DataFlavor.stringFlavor
+        LOG.info("Collage ($via) : formats du presse-papiers = ${tr.transferDataFlavors.joinToString { it.mimeType.substringBefore(';') + "/" + it.representationClass.simpleName }}")
         if (tr.isDataFlavorSupported(fileFlavor)) {
             val files = (runCatching { tr.getTransferData(fileFlavor) as? List<*> }.getOrNull() ?: emptyList<Any>())
                 .filterIsInstance<java.io.File>()
                 .mapNotNull { LocalFileSystem.getInstance().refreshAndFindFileByIoFile(it) }
             if (files.isNotEmpty()) { attachVirtualFiles(files); return true }
         }
-        if (!tr.isDataFlavorSupported(imageFlavor)) return false
         // du texte copié avec une image (tableur, page web) : c'est le texte qu'on veut coller
-        if (tr.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.stringFlavor) &&
-            runCatching { (tr.getTransferData(java.awt.datatransfer.DataFlavor.stringFlavor) as? String).orEmpty().isNotBlank() }.getOrDefault(false)) return false
-        val img = runCatching { tr.getTransferData(imageFlavor) as? java.awt.Image }.getOrNull() ?: return false
-        val w = img.getWidth(null); val h = img.getHeight(null)
-        if (w <= 0 || h <= 0) return false
-        val bi = java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-        bi.createGraphics().apply { drawImage(img, 0, 0, null); dispose() }
-        val bos = java.io.ByteArrayOutputStream()
-        javax.imageio.ImageIO.write(bi, "png", bos)
-        extraImages.add(Triple("image-${++pasteCount}.png", "image/png", Base64.getEncoder().encodeToString(bos.toByteArray())))
+        if (tr.isDataFlavorSupported(textFlavor) &&
+            runCatching { (tr.getTransferData(textFlavor) as? String).orEmpty().isNotBlank() }.getOrDefault(false)) return false
+        val png = clipboardImagePng(tr) ?: return false
+        extraImages.add(Triple("image-${++pasteCount}.png", "image/png", Base64.getEncoder().encodeToString(png)))
         updateExtras()
         return true
+    }
+
+    /** Image du presse-papiers encodée en PNG : via `imageFlavor`, sinon via un format image (png, jpeg…) lu en flux (Wayland). */
+    private fun clipboardImagePng(tr: java.awt.datatransfer.Transferable): ByteArray? {
+        fun encode(img: java.awt.Image): ByteArray? {
+            val w = img.getWidth(null); val h = img.getHeight(null)
+            if (w <= 0 || h <= 0) return null
+            val bi = java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            bi.createGraphics().apply { drawImage(img, 0, 0, null); dispose() }
+            return java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(bi, "png", it) }.toByteArray()
+        }
+        if (tr.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.imageFlavor)) {
+            (runCatching { tr.getTransferData(java.awt.datatransfer.DataFlavor.imageFlavor) as? java.awt.Image }
+                .onFailure { LOG.info("Collage : imageFlavor illisible : $it") }.getOrNull())?.let { encode(it)?.let { b -> return b } }
+        }
+        val streams = tr.transferDataFlavors.filter { it.primaryType == "image" }
+            .sortedBy { if (it.subType == "png") 0 else 1 }
+        for (f in streams) {
+            val data = runCatching { tr.getTransferData(f) }.onFailure { LOG.info("Collage : ${f.mimeType} illisible : $it") }.getOrNull()
+            val bytes = (data as? java.io.InputStream)?.use { it.readBytes() }
+            val img = when {
+                bytes != null -> runCatching { javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(bytes)) }.getOrNull()
+                data is java.awt.Image -> data
+                else -> null
+            }
+            if (img != null) encode(img)?.let { return it }
+        }
+        return null
     }
 
     private var projectFiles: List<String> = emptyList()

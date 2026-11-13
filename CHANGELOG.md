@@ -3,6 +3,7 @@
 ## Non publié
 
 - **Collage d'images** : Ctrl+V / Maj+Inser et le glisser-déposer passent maintenant par un `TransferHandler` et un raccourci dédiés (le collage ne passait pas par `paste()` dans l'IDE) ; les fichiers copiés depuis un gestionnaire de fichiers sont aussi joints. Du texte copié avec une image (tableur, page web) reste collé comme texte
+- Collage d'image sous Wayland : si `imageFlavor` n'est pas fourni, l'image est lue depuis les formats `image/png`, `image/jpeg`… du presse-papiers ; les formats disponibles sont journalisés (« Collage (…) : formats du presse-papiers ») pour le diagnostic
 - **Aperçu des pièces jointes** : miniatures des images (clic pour agrandir), pastilles pour les fichiers, retrait pièce par pièce (×) au lieu de la simple liste de noms
 
 - Suppression de la case « Autoriser la télémétrie » des réglages : elle n'était lue par aucun code et ne déclenchait aucun envoi
