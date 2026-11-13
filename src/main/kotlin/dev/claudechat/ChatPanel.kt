@@ -1616,6 +1616,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     private val linker = Linkify({ cwd })
+    private val renders = RenderCache()
 
     // ---------- Rendu ----------
 
@@ -1625,6 +1626,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         alarm.addRequest({ renderPending = false; render() }, 80)
     }
 
+    private var lastHtml = ""
+
     private fun render(forceBottom: Boolean = false) {
         val bar = scroll.verticalScrollBar
         val atBottom = forceBottom || bar.value + bar.visibleAmount >= bar.maximum - 40
@@ -1633,7 +1636,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         titleLabel.text = customTitle ?: session.title
         content?.displayName = tabTitle()
         syncSend()
-        view.text = Highlight.apply(buildHtml(), searchQuery)
+        val html = Highlight.apply(buildHtml(), searchQuery)
+        if (html != lastHtml) { view.text = html; lastHtml = html }
         // FR-08 : ne pas faire sauter le défilement si l'utilisateur est remonté.
         SwingUtilities.invokeLater { bar.value = if (atBottom) bar.maximum else oldValue }
     }
@@ -1672,6 +1676,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         sb.append("</style></head><body>")
         var lastRole = ""
         responseTexts.clear(); codeTexts.clear()
+        renders.retainOnly(session.entries)
         var respOpen = false
         for (e in session.entries) {
             if (e.kind == Kind.USER && respOpen) { sb.append("</div>"); respOpen = false }
@@ -1682,7 +1687,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                     sb.append("<table width='100%' cellpadding='0' cellspacing='0'><tr><td width='4' bgcolor='${hex(you)}'>&nbsp;</td><td bgcolor='${hex(userBg)}'>")
                     sb.append("<table cellpadding='7' cellspacing='0'><tr><td>")
                     sb.append(speakerLabel("Vous", hex(you), listOfNotNull(e.attached?.let { "joint : $it" }, e.note).joinToString(" · ")))
-                    sb.append("<br/>").append(Md.toHtml(e.text)).append("</td></tr></table></td></tr></table>")
+                    sb.append("<br/>").append(renders.render(e, e.text) { Md.toHtml(e.text) }).append("</td></tr></table></td></tr></table>")
                 }
                 else -> {
                     if (lastRole != "claude" && e.kind != Kind.NOTICE && e.kind != Kind.ERROR) {
@@ -1692,11 +1697,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                     }
                     when (e.kind) {
                         Kind.TEXT -> {
-                            sb.append(linker.images(linker.files(Md.toHtml(e.text, codeTexts))))
+                            sb.append(renders.render(e, e.text to linker.stamp(), codeTexts) { c -> linker.images(linker.files(Md.toHtml(e.text, c))) })
                             if (responseTexts.isNotEmpty()) responseTexts[responseTexts.lastIndex] = (responseTexts.last() + "\n\n" + e.text).trim()
                         }
                         Kind.THINKING -> if (showThinking) sb.append("<blockquote><font color='gray'><i>${esc(e.text).replace("\n", "<br/>")}</i></font></blockquote>")
-                        Kind.TOOL -> if (showTools) sb.append(toolCard(e, codeBg))
+                        Kind.TOOL -> if (showTools) sb.append(renders.render(e, listOf(e.result, e.isError, codeBg.rgb, linker.stamp())) { toolCard(e, codeBg) })
                         Kind.NOTICE -> sb.append("<p><font color='gray'><i>${esc(e.text)}</i></font></p>")
                         Kind.ERROR -> sb.append("<p><font color='red'><b>Erreur :</b> ${esc(e.text)}</font></p>")
                         else -> {}

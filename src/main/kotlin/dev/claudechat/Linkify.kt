@@ -16,7 +16,12 @@ class Linkify(
 ) {
     private val cache = HashMap<String, Pair<Long, Boolean>>()
 
-    fun invalidate() = cache.clear()
+    private var invalidations = 0
+
+    fun invalidate() { cache.clear(); invalidations++ }
+
+    /** Change quand le résultat de [files] / [images] peut avoir changé (invalidation, ou changement de fenêtre de 6 × la durée du cache d'existence). */
+    fun stamp(): Pair<Int, Long> = invalidations to now() / (ttlMs * 6)
 
     private fun abs(p: String) = if (p.startsWith("/")) p else "${cwd()}/$p"
 
