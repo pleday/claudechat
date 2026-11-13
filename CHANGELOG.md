@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.4
+
+- **Pièce jointe seule** : une image ou un fichier joint suffit pour envoyer un message (le bouton d'envoi s'active sans texte)
+- **URLs cliquables** : les adresses écrites dans les réponses de Claude s'ouvrent dans le navigateur
+- **Plus d'ascenseur horizontal** parasite : les blocs de code passent à la ligne au lieu d'élargir tout le panneau
+- **Copier au survol** : un bouton apparaît sur les blocs de code et les citations pour copier leur contenu seul ; le bouton « Copier la dernière réponse » de la barre d'outils est supprimé
+- Sablier animé pendant que Claude répond
+
 ## 0.8.3
 
 - **Collage d'images** : Ctrl+V / Maj+Inser et le glisser-déposer passent maintenant par un `TransferHandler` et un raccourci dédiés (le collage ne passait pas par `paste()` dans l'IDE) ; les fichiers copiés depuis un gestionnaire de fichiers sont aussi joints. Du texte copié avec une image (tableur, page web) reste collé comme texte
