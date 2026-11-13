@@ -674,8 +674,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             session.id, settings.state.system, emptyList(), fork, waitForMcp = true,
         )
         ApplicationManager.getApplication().executeOnPooledThread {
-            val mcp = emptyList<McpEntry>()
-            val t = CliTurn(TurnOptions(opts.cli, opts.cwd, opts.model, opts.effort, opts.permissionMode, opts.sessionId, opts.appendSystem, mcp, fork, waitForMcp = true), content, listener(gen))
+            val t = CliTurn(opts, content, listener(gen))
             ApplicationManager.getApplication().invokeLater({ if (gen == generation) turn = t else t.kill() }, ModalityState.any())
             t.start()
         }
