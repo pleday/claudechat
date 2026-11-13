@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+
+- Suppression de la case « Autoriser la télémétrie » des réglages : elle n'était lue par aucun code et ne déclenchait aucun envoi
+
 ## 0.8.2
 
 - **Serveurs MCP prêts avant l'envoi** : la CLI démarre ses serveurs MCP en tâche de fond, et au premier message ceux encore « pending » n'avaient pas d'outils (Claude les croyait déconnectés, par exemple SonarQube). Le plugin attend maintenant leur connexion (15 s max, requête `mcp_status`) avant d'envoyer, et affiche une notice si un serveur est en échec ou toujours en attente

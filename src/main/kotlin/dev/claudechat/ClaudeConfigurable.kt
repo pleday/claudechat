@@ -86,12 +86,6 @@ class ClaudeConfigurable : BoundConfigurable("Claude Chat") {
             row("Délai de reprise après le début de la session suivante (minutes) :") { intTextField(0..120).bindIntText(s.state::autoResumeDelayMin) }
             row { checkBox("Notification à la fin d'une tâche ou lors d'une demande d'approbation").bindSelected(s.state::notify) }
         }
-        group("Confidentialité") {
-            row {
-                checkBox("Autoriser la télémétrie (désactivée par défaut, révocable)").bindSelected(s.state::telemetryConsent)
-                    .comment("Le plugin n'envoie aucune donnée tant que ce consentement n'est pas donné.")
-            }
-        }
         group("Accès à distance (smartphone, via Telegram)") {
             row {
                 comment("Débloque une session depuis ton téléphone : demandes d'autorisation, plans et questions arrivent dans un chat Telegram avec des boutons. " +
