@@ -94,6 +94,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var liveCtx = 0
     private var liveOut = 0
     private var turnStart = 0L
+    private var lastDurationMs = 0L          // durée de la dernière réponse terminée normalement (0 = aucune / en cours)
     private var autoResumeOn = settings.state.autoResume
     private var lastLimits: RateLimits? = null
     private var resumeAt = 0L
@@ -673,7 +674,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         openKind = null
         val gen = ++generation
         idleTurn?.kill(); idleTurn = null // le nouveau message ouvre son propre processus
-        turnStart = System.currentTimeMillis(); liveOut = 0; lastLimits = null
+        turnStart = System.currentTimeMillis(); lastDurationMs = 0L; liveOut = 0; lastLimits = null
         tick()
         val model = selectedModel.ifBlank { settings.state.model }
         settings.state.model = model
@@ -740,7 +741,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             if (streaming) return@ui
             streaming = true; interrupted = false; openKind = null
             turn = idleTurn
-            turnStart = System.currentTimeMillis(); liveOut = 0
+            turnStart = System.currentTimeMillis(); lastDurationMs = 0L; liveOut = 0
             tick(); syncSend()
         }
     }
@@ -798,7 +799,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             val sec = (System.currentTimeMillis() - turnStart) / 1000
             "%s Réponse en cours · %d:%02d · contexte %s · sortie %s tokens".format(if (hourglassFrame % 2 == 0) "⏳" else "⌛", sec / 60, sec % 60, fmt(liveCtx), fmt(liveOut)) +
                 (model?.let { " · $it" } ?: "")
-        } else if (model != null) "$model · contexte ${fmt(liveCtx)} tokens" else ""
+        } else listOfNotNull(
+            model?.let { "$it · contexte ${fmt(liveCtx)} tokens" },
+            lastDurationMs.takeIf { it > 0 }?.let { "réponse en ${formatDuration(it)}" },
+        ).joinToString(" · ")
         statusLabel.toolTipText = activeModel?.let { "Modèle utilisé : $it" }
     }
 
@@ -886,6 +890,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun finish(isError: Boolean, message: String?) {
         streaming = false
+        lastDurationMs = if (!isError && !interrupted) System.currentTimeMillis() - turnStart else 0L
         idleTurn = turn // process gardé ouvert un moment : la CLI peut reprendre (tâche de fond), voir onResumed
         turn = null
         updateStatus()
@@ -900,8 +905,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             if (interrupted) session.entries.add(Entry(Kind.NOTICE, "Réponse interrompue."))
             else if (until != null) session.entries.add(Entry(Kind.NOTICE, "Quota atteint : la conversation reprendra automatiquement ${settings.state.autoResumeDelayMin} min après le début de la prochaine session."))
             else session.entries.add(Entry(Kind.ERROR, message ?: "Erreur"))
-        } else if (!interrupted) {
-            session.entries.add(Entry(Kind.NOTICE, "Réponse donnée en ${formatDuration(System.currentTimeMillis() - turnStart)}"))
         }
         if (until != null) {
             scheduleResume(until * 1000)
