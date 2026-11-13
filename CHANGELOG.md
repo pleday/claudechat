@@ -2,6 +2,8 @@
 
 ## Non publié
 
+- **Permissions « Stream closed »** : l'entrée de la CLI n'est plus fermée dès la fin d'un tour mais quand elle est silencieuse (1,5 s, plafond 2 min), pour ne plus faire échouer les permissions d'un travail qui continue. Une permission demandée après la fin du tour est refusée avec un message clair (et une notice dans le panneau) ; les événements tardifs sont journalisés dans `idea.log`
+
 - **Auto-complétion de `/`** : popup flottant au niveau du curseur, navigation ↑/↓, Entrée ou Tab pour valider, Échap pour fermer. Les commandes viennent de la CLI (requête `initialize`, sans appel au modèle), regroupées par catégorie, avec descriptions en français pour les commandes connues ; les raccourcis du plugin passent en premier
 - Même popup pour les mentions `@fichier` : liste préchargée à l'ouverture, dossiers cachés et fichiers ignorés exclus, fichiers ouverts puis récents proposés pour un `@` seul
 

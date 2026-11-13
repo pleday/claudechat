@@ -633,6 +633,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             usageIn += input; usageOut += output; this@ChatPanel.costUsd += costUsd; updateUsage()
         }
         override fun onDone(isError: Boolean, message: String?) = ui(gen) { finish(isError, message) }
+        override fun onLatePermission(tool: String) = ui(gen) {
+            session.entries.add(Entry(Kind.NOTICE, "Claude a demandé l'autorisation « $tool » après la fin de sa réponse : refusée automatiquement. Renvoyez votre demande dans un nouveau message."))
+            scheduleRender()
+        }
     }
 
     private fun scheduleResume(atMs: Long) {
