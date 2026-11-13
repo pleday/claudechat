@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 0.8.0
 
 - Icône du plugin (clair et sombre) pour le Marketplace et la fenêtre des plugins
 
