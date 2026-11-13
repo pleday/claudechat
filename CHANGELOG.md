@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 0.9.0
 
 - **Haut de la zone de saisie plus compact** : les fichiers modifiés par Claude et la suggestion du message suivant tiennent sur une seule rangée de pastilles alignées à gauche (même style que les pièces jointes), au lieu de deux lignes centrées empilées ; chaque pastille a sa croix (oublier les modifications, ignorer la suggestion)
 - **Fichiers modifiés par Claude** : une ligne au-dessus du champ de saisie (et un bouton de la barre d'outils) indique combien de fichiers Claude a modifiés dans la conversation (+lignes ajoutées −retirées) ; un clic ouvre l'arbre des changements de l'IDE, dont chaque fichier s'ouvre dans l'outil de comparaison de l'IDE (état avant Claude contre état actuel, navigation d'un fichier au suivant). Sont comptés les fichiers modifiés directement par Claude comme ceux touchés par une commande (Bash, sous-agent, outil MCP) ; rien ne dépend de git (commit automatique, fichier non versionné ou ignoré : sans effet) et vos propres modifications n'apparaissent pas

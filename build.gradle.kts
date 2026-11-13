@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.claudechat"
-version = "0.8.4"
+version = "0.9.0"
 
 repositories {
     mavenCentral()
