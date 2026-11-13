@@ -58,6 +58,8 @@ class TurnOptions(
     val appendSystem: String,
     val mcp: List<McpEntry>,
     val fork: Boolean = false,
+    /** Attendre que les serveurs MCP aient fini de se connecter avant d'envoyer le message (sinon leurs outils manquent). */
+    val waitForMcp: Boolean = false,
 )
 
 /** Callbacks appelés depuis le thread de lecture : l'appelant doit rebasculer sur l'EDT. */
@@ -79,6 +81,8 @@ interface TurnListener {
     fun onDone(isError: Boolean, message: String?) {}
     /** La CLI a repris du travail après un `result` (tâche de fond, message empilé…) : le tour est de nouveau en cours. */
     fun onResumed() {}
+    /** Serveurs MCP non connectés (« nom (statut) ») à l'envoi du message : leurs outils sont indisponibles pour ce tour. */
+    fun onMcpProblem(servers: List<String>) {}
 }
 
 /**
@@ -94,6 +98,8 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
     private val refinements = java.util.concurrent.CopyOnWriteArrayList<String>()
     private val stderr = StringBuffer()
     @Volatile private var lastActivity = System.nanoTime()
+    /** Dernier statut MCP reçu (nom, statut) en réponse à `mcp_status`. */
+    @Volatile private var mcpStatus: List<Pair<String, String>>? = null
 
     fun start() {
         val cmd = mutableListOf(
@@ -117,10 +123,38 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         out = p.outputStream.bufferedWriter()
         Thread({ p.errorStream.bufferedReader().forEachLine { stderr.append(it).append('\n') } }, "claude-stderr").apply { isDaemon = true }.start()
         Thread({ read(p) }, "claude-stdout").apply { isDaemon = true }.start()
-        send(JsonObject().apply {
+        val first = JsonObject().apply {
             addProperty("type", "user")
             add("message", JsonObject().apply { addProperty("role", "user"); add("content", content) })
-        })
+        }
+        if (o.waitForMcp) Thread({ awaitMcp(); if (!killed) send(first) }, "claude-mcp-wait").apply { isDaemon = true }.start()
+        else send(first)
+    }
+
+    /**
+     * La CLI démarre ses serveurs MCP en tâche de fond : au premier message, ceux qui sont encore « pending » n'ont
+     * pas d'outils (le modèle les croit absents ou déconnectés). On attend donc leur connexion (15 s max) avant d'envoyer.
+     */
+    private fun awaitMcp() {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(MCP_WAIT_MS)
+        var i = 0
+        while (!killed && proc?.isAlive == true && System.nanoTime() < deadline) {
+            mcpStatus = null
+            send(JsonObject().apply {
+                addProperty("type", "control_request"); addProperty("request_id", "mcp-wait-${i++}")
+                add("request", JsonObject().apply { addProperty("subtype", "mcp_status") })
+            })
+            var w = 0
+            while (mcpStatus == null && w++ < 40 && !killed) Thread.sleep(50)
+            val st = mcpStatus ?: break // la CLI ne répond pas à mcp_status : on n'attend pas
+            if (st.none { it.second == "pending" }) break
+            Thread.sleep(300)
+        }
+        val bad = mcpStatus?.filter { it.second == "failed" || it.second == "pending" }.orEmpty()
+        if (bad.isNotEmpty()) {
+            LOG.warn("Serveurs MCP non prêts à l'envoi : $bad")
+            l.onMcpProblem(bad.map { "${it.first} (${it.second})" })
+        }
     }
 
     private fun read(p: Process) {
@@ -155,6 +189,12 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                                 "text" -> refinements.remove(bo["text"]?.asString?.trim())
                             }
                         }
+                    }
+                    "control_response" -> j["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.let { resp ->
+                        if (resp["request_id"]?.asString?.startsWith("mcp-wait") == true)
+                            mcpStatus = resp["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("mcpServers")?.takeIf { it.isJsonArray }
+                                ?.asJsonArray?.mapNotNull { e -> e.asJsonObject.let { o -> o["name"]?.asString?.let { n -> n to (o["status"]?.asString ?: "") } } }
+                                ?: emptyList()
                     }
                     "rate_limit_event" -> parseRateLimits(j)?.let(l::onRateLimits)
                     "control_request" -> {
@@ -280,6 +320,9 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(CliTurn::class.java)
         private val RESUME_EVENTS = setOf("stream_event", "assistant", "control_request")
         /** Silence après un `result` avant de fermer l'entrée de la CLI. */
+        /** Processus utilitaires (commandes, quota) : inutile de démarrer les serveurs MCP de l'utilisateur à chaque fois. */
+        private val NO_MCP = listOf("--strict-mcp-config", "--mcp-config", """{"mcpServers":{}}""")
+        private const val MCP_WAIT_MS = 15_000L
         var QUIET_BEFORE_CLOSE_NS = TimeUnit.MINUTES.toNanos(3)
 
         private fun mcpJson(list: List<McpEntry>) = JsonObject().apply {
@@ -299,7 +342,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
          */
         fun probeQuota(cli: String, cwd: String, timeoutSec: Long = 60): ProbeResult = try {
             val cmd = listOf(cli, "-p", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
-                "--permission-mode", "dontAsk", "--permission-prompts", "none", "--model", "claude-haiku-5-5")
+                "--permission-mode", "dontAsk", "--permission-prompts", "none", "--model", "claude-haiku-5-5") + NO_MCP
             val p = ProcessBuilder(cmd).directory(java.io.File(cwd)).start()
             p.outputStream.bufferedWriter().use { it.write("ok") }
             val err = StringBuffer()
@@ -322,7 +365,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
          * donc aucun appel au modèle. Bloquant ; liste vide en cas d'échec.
          */
         fun listCommands(cli: String, cwd: String, timeoutSec: Long = 20): List<CliCommand> = try {
-            val cmd = listOf(cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence")
+            val cmd = listOf(cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence") + NO_MCP
             val p = ProcessBuilder(cmd).directory(java.io.File(cwd)).redirectError(ProcessBuilder.Redirect.DISCARD).start()
             val w = p.outputStream.bufferedWriter()
             w.write(JsonObject().apply {

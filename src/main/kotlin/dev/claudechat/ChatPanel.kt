@@ -587,11 +587,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         forkNext = false
         val opts = TurnOptions(
             settings.cliPath(), cwd, model, selectedEffort, currentMode(),
-            session.id, settings.state.system, emptyList(), fork,
+            session.id, settings.state.system, emptyList(), fork, waitForMcp = true,
         )
         ApplicationManager.getApplication().executeOnPooledThread {
             val mcp = emptyList<McpEntry>()
-            val t = CliTurn(TurnOptions(opts.cli, opts.cwd, opts.model, opts.effort, opts.permissionMode, opts.sessionId, opts.appendSystem, mcp, fork), content, listener(gen))
+            val t = CliTurn(TurnOptions(opts.cli, opts.cwd, opts.model, opts.effort, opts.permissionMode, opts.sessionId, opts.appendSystem, mcp, fork, waitForMcp = true), content, listener(gen))
             ApplicationManager.getApplication().invokeLater({ if (gen == generation) turn = t else t.kill() }, ModalityState.any())
             t.start()
         }
@@ -635,6 +635,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             usageIn += input; usageOut += output; this@ChatPanel.costUsd += costUsd; updateUsage()
         }
         override fun onDone(isError: Boolean, message: String?) = ui(gen) { finish(isError, message) }
+        override fun onMcpProblem(servers: List<String>) = ui(gen) {
+            session.entries.add(Entry(Kind.NOTICE, "Serveur MCP non connecté : ${servers.joinToString(", ")}. Ses outils sont indisponibles pour cette réponse (voir la fenêtre MCP)."))
+            scheduleRender()
+        }
         override fun onResumed() = ui(gen) {
             if (streaming) return@ui
             streaming = true; interrupted = false; openKind = null

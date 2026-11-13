@@ -95,6 +95,28 @@ echo '{"type":"result","is_error":false}'
         assertTrue(Files.readString(out).contains("\"behavior\":\"allow\""))
     }
 
+    @Test fun waitsForMcpBeforeSendingAndReportsFailures() {
+        val out = tmp.resolve("order.txt")
+        // 1re réponse : sonarqube « pending » ; 2e : « failed » ; le message utilisateur ne doit arriver qu'ensuite
+        val cli = fake("""
+read -r a; echo "${'$'}a" >> $out
+echo '{"type":"control_response","response":{"subtype":"success","request_id":"mcp-wait-0","response":{"mcpServers":[{"name":"sonarqube","status":"pending"},{"name":"idea","status":"connected"}]}}}'
+read -r b; echo "${'$'}b" >> $out
+echo '{"type":"control_response","response":{"subtype":"success","request_id":"mcp-wait-1","response":{"mcpServers":[{"name":"sonarqube","status":"failed"},{"name":"idea","status":"connected"}]}}}'
+read -r c; echo "${'$'}c" >> $out
+echo '{"type":"result","is_error":false}'
+""")
+        val problems = CopyOnWriteArrayList<String>()
+        val rec = Rec()
+        val t = CliTurn(TurnOptions(cli, tmp.toString(), "sonnet", "auto", "manual", null, "", emptyList(), false, waitForMcp = true), prompt,
+            object : TurnListener by rec { override fun onMcpProblem(servers: List<String>) { problems += servers } })
+        t.start()
+        assertTrue(rec.done.await(15, TimeUnit.SECONDS), "événements : ${rec.events}")
+        val lines = Files.readAllLines(out).map { com.google.gson.JsonParser.parseString(it).asJsonObject }
+        assertEquals(listOf("control_request", "control_request", "user"), lines.map { it["type"].asString })
+        assertEquals(listOf("sonarqube (failed)"), problems.toList())
+    }
+
     @Test fun sendsUserMessageAsStreamJson() {
         val out = tmp.resolve("stdin.txt")
         val cli = fake("""read -r line; echo "${'$'}line" > $out; echo '{"type":"result","is_error":false}'""")
