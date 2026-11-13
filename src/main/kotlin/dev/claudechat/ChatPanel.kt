@@ -755,10 +755,13 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun cancelResume() { resumeAt = 0; resumeAttempts = 0; updateStatus() }
 
+    private var hourglassFrame = 0
+
     private fun tick() {
         if (!streaming) return
         updateStatus()
-        alarm.addRequest({ tick() }, 1000)
+        hourglassFrame++
+        alarm.addRequest({ tick() }, 500)
     }
 
     private fun updateRing() {
@@ -779,7 +782,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         statusLabel.text = if (streaming) {
             val sec = (System.currentTimeMillis() - turnStart) / 1000
-            "⏳ Réponse en cours · %d:%02d · contexte %s · sortie %s tokens".format(sec / 60, sec % 60, fmt(liveCtx), fmt(liveOut)) +
+            "%s Réponse en cours · %d:%02d · contexte %s · sortie %s tokens".format(if (hourglassFrame % 2 == 0) "⏳" else "⌛", sec / 60, sec % 60, fmt(liveCtx), fmt(liveOut)) +
                 (model?.let { " · $it" } ?: "")
         } else if (model != null) "$model · contexte ${fmt(liveCtx)} tokens" else ""
         statusLabel.toolTipText = activeModel?.let { "Modèle utilisé : $it" }
