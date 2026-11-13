@@ -81,4 +81,49 @@ done""")
         val t = live(tmp.resolve("log.txt"))
         try { assertNull(t.request("unknown_subtype", timeoutMs = 600)) } finally { t.kill() }
     }
+
+    @Test fun suggestionEventReachesTheListenerAfterTheResult() {
+        val cli = fake("""read -r first
+echo '{"type":"result","is_error":false}'
+echo '{"type":"prompt_suggestion","suggestion":"  crée les fichiers directement \n et plus"}'
+echo '{"type":"prompt_suggestion","suggestion":"   "}'
+sleep 3""")
+        val got = java.util.concurrent.LinkedBlockingQueue<String>()
+        val resumed = java.util.concurrent.atomic.AtomicBoolean(false)
+        val l = object : TurnListener {
+            override fun onSuggestion(text: String) { got.add(text) }
+            override fun onResumed() { resumed.set(true) }
+        }
+        val content = JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", "x") }) }
+        val t = CliTurn(TurnOptions(cli, tmp.toString(), "", "auto", "manual", null, "", emptyList(), suggestions = true), content, l)
+        t.start()
+        try {
+            assertEquals("crée les fichiers directement", got.poll(10, TimeUnit.SECONDS))
+            assertNull(got.poll(500, TimeUnit.MILLISECONDS), "suggestion vide ignorée")
+            assertFalse(resumed.get(), "une suggestion n'est pas une reprise d'activité")
+        } finally { t.kill() }
+    }
+
+    @Test fun suggestionsFlagIsPassedOnlyWhenEnabled() {
+        for (enabled in listOf(true, false)) {
+            val args = tmp.resolve("args-$enabled.txt")
+            val cli = fake("""echo "§@" > $args
+read -r first
+echo '{"type":"result","is_error":false}'""")
+            val done = CountDownLatch(1)
+            val content = JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", "x") }) }
+            val t = CliTurn(TurnOptions(cli, tmp.toString(), "", "auto", "manual", null, "", emptyList(), suggestions = enabled), content,
+                object : TurnListener { override fun onDone(isError: Boolean, message: String?) { done.countDown() } })
+            t.start()
+            assertTrue(done.await(10, TimeUnit.SECONDS)); t.kill()
+            assertEquals(enabled, "--prompt-suggestions" in Files.readString(args), Files.readString(args))
+        }
+    }
+
+    @Test fun cleanSuggestionKeepsOneBoundedLine() {
+        assertEquals("a b", CliTurn.cleanSuggestion("\n  a b  \nsuite"))
+        assertNull(CliTurn.cleanSuggestion("  \n "))
+        assertNull(CliTurn.cleanSuggestion(null))
+        assertEquals(300, CliTurn.cleanSuggestion("x".repeat(500))!!.length)
+    }
 }

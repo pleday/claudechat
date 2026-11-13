@@ -63,6 +63,8 @@ class TurnOptions(
     val fork: Boolean = false,
     /** Attendre que les serveurs MCP aient fini de se connecter avant d'envoyer le message (sinon leurs outils manquent). */
     val waitForMcp: Boolean = false,
+    /** La CLI prédit le prochain message de l'utilisateur après chaque réponse (`--prompt-suggestions`). */
+    val suggestions: Boolean = false,
 )
 
 /** Callbacks appelés depuis le thread de lecture : l'appelant doit rebasculer sur l'EDT. */
@@ -84,6 +86,8 @@ interface TurnListener {
     fun onDone(isError: Boolean, message: String?) {}
     /** La CLI a repris du travail après un `result` (tâche de fond, message empilé…) : le tour est de nouveau en cours. */
     fun onResumed() {}
+    /** Message que l'utilisateur écrira probablement ensuite, proposé par la CLI après la réponse. */
+    fun onSuggestion(text: String) {}
     /** Serveurs MCP non connectés (« nom (statut) ») à l'envoi du message : leurs outils sont indisponibles pour ce tour. */
     fun onMcpProblem(servers: List<String>) {}
 }
@@ -114,6 +118,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         if (o.effort.isNotBlank() && o.effort != "auto") cmd += listOf("--effort", o.effort)
         if (o.sessionId != null) cmd += listOf("--resume", o.sessionId)
         if (o.sessionId != null && o.fork) cmd += "--fork-session"
+        if (o.suggestions) cmd += "--prompt-suggestions"
         if (o.appendSystem.isNotBlank()) cmd += listOf("--append-system-prompt", o.appendSystem)
         if (o.mcp.isNotEmpty()) cmd += listOf("--mcp-config", mcpJson(o.mcp))
         val pb = ProcessBuilder(cmd).directory(java.io.File(o.cwd))
@@ -201,6 +206,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                                 ?: emptyList()
                     }
                     "rate_limit_event" -> parseRateLimits(j)?.let(l::onRateLimits)
+                    "prompt_suggestion" -> cleanSuggestion(j["suggestion"]?.takeIf { it.isJsonPrimitive }?.asString)?.let(l::onSuggestion)
                     "control_request" -> {
                         val r = j["request"].asJsonObject
                         if (r["subtype"]?.asString == "can_use_tool") {
@@ -401,6 +407,10 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
             else limits?.let { ProbeResult(it, null) }
                 ?: ProbeResult(null, err.toString().trim().ifEmpty { "la CLI n'a fourni aucune information de quota (compte API, proxy ou version sans cette donnée ?)" })
         } catch (e: Exception) { ProbeResult(null, "impossible de lancer la CLI : ${e.message}") }
+
+        /** Suggestion exploitable : une ligne, sans espaces superflus, bornée ; null si vide. */
+        fun cleanSuggestion(raw: String?): String? =
+            raw?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.take(300)?.takeIf { it.isNotEmpty() }
 
         private fun controlRequest(id: String, subtype: String, fields: Map<String, String> = emptyMap()) = JsonObject().apply {
             addProperty("type", "control_request"); addProperty("request_id", id)

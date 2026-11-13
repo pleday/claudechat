@@ -85,6 +85,7 @@ class ClaudeConfigurable : BoundConfigurable("Claude Chat") {
             }
             row("Délai de reprise après le début de la session suivante (minutes) :") { intTextField(0..120).bindIntText(s.state::autoResumeDelayMin) }
             row { checkBox("Notification à la fin d'une tâche ou lors d'une demande d'approbation").bindSelected(s.state::notify) }
+            row { checkBox("Proposer le message suivant après chaque réponse (une petite requête en plus, environ 10 % de coût)").bindSelected(s.state::promptSuggestions) }
         }
         group("Accès à distance (smartphone, via Telegram)") {
             row {

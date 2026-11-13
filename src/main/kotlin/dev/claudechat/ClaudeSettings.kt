@@ -26,6 +26,7 @@ class ClaudeSettings : PersistentStateComponent<ClaudeSettings.State> {
         var busyMode: String = "refine"
         var autoResumeDelayMin: Int = 2
         var autoDiff: Boolean = true
+        var promptSuggestions: Boolean = true
         var remoteEnabled: Boolean = false
         var rlAt: Long = 0
         var rlFiveUtil: Double = -1.0

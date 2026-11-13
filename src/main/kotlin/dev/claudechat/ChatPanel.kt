@@ -217,7 +217,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         })
         inputMap.put(KeyStroke.getKeyStroke("TAB"), "claude-complete")
         actionMap.put("claude-complete", object : AbstractAction() {
-            override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept")) transferFocus() }
+            override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept") && !acceptSuggestion()) transferFocus() }
         })
         for ((key, dir, base) in listOf(Triple("UP", "up", "caret-up"), Triple("DOWN", "down", "caret-down"))) {
             val original = actionMap.get(base)
@@ -267,6 +267,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     /** Rond orange avec flèche (envoyer) ou carré (interrompre) ; le menu mémorise « file d'attente » ou « préciser ». */
     private fun syncSend() {
+        updateSuggestRow()
         val blank = input.text.isBlank() && extraFiles.isEmpty() && extraImages.isEmpty()
         val menu = listOf(
             SplitItem("Mettre en file d'attente", AllIcons.Actions.MoveDown, "Envoyé quand la réponse en cours est terminée", busyMode == SendMode.QUEUE) { setBusyMode(SendMode.QUEUE) },
@@ -279,6 +280,31 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             } else "Envoyer (Entrée)"
             sendControl.configure(RoundSendButton.Mode.SEND, !blank, tip, menu) { send() }
         }
+    }
+
+    private fun setSuggestion(text: String?) { suggestion = text; updateSuggestRow() }
+
+    /** Visible seulement quand Claude a fini et que le champ est vide : sinon elle gênerait la frappe. */
+    private fun updateSuggestRow() {
+        val s = suggestion
+        val show = s != null && !streaming && input.text.isBlank()
+        val text = if (show) "Suggestion : " + s!!.replace(Regex("\\s+"), " ").take(160) else ""
+        if (show != suggestRow.isVisible || text != suggestLabel.text) {
+            suggestLabel.text = text
+            suggestRow.isVisible = show
+            suggestRow.revalidate(); suggestRow.repaint()
+        }
+    }
+
+    /** Insère la suggestion dans le champ vide ; false s'il n'y en a pas ou si le champ contient déjà du texte. */
+    private fun acceptSuggestion(): Boolean {
+        val s = suggestion ?: return false
+        if (input.text.isNotBlank()) return false
+        suggestion = null
+        input.text = s
+        input.requestFocusInWindow()
+        input.caretPosition = input.document.length
+        return true
     }
 
     private val titleLabel = JBLabel().apply { border = JBUI.Borders.emptyLeft(6) }
@@ -305,6 +331,23 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         border = JBUI.Borders.empty(0, 6)
         add(queueLabel, BorderLayout.CENTER)
         add(ActionLink("vider").apply { addActionListener { queue.clear(); updateQueue() } }, BorderLayout.EAST)
+    }
+    // Suggestion du message suivant proposée par la CLI (--prompt-suggestions) : un clic, ou Tab dans le champ vide, l'insère
+    private var suggestion: String? = null
+    private val suggestLabel = JBLabel(AllIcons.Actions.IntentionBulb).apply {
+        foreground = UIUtil.getContextHelpForeground()
+        iconTextGap = JBUI.scale(4)
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        toolTipText = "Cliquer (ou Tab dans le champ vide) pour utiliser cette suggestion"
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) { acceptSuggestion() }
+        })
+    }
+    private val suggestRow = JPanel(BorderLayout()).apply {
+        isVisible = false
+        border = JBUI.Borders.empty(0, 6)
+        add(suggestLabel, BorderLayout.CENTER)
+        add(ActionLink("×").apply { toolTipText = "Ignorer"; addActionListener { setSuggestion(null) } }, BorderLayout.EAST)
     }
     // Modèle, effort et permissions : état + boutons plats (menus au-dessus de la carte de saisie)
     private var selectedModel = ModelCatalog.resolve(settings.state.model)
@@ -524,7 +567,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val topRows = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
-            add(extrasRow); add(queueRow)
+            add(extrasRow); add(queueRow); add(suggestRow)
         }
         val bottom = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(2, 6, 6, 6)
@@ -592,7 +635,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun newSession() {
         if (!confirmDiscard("Démarrer une nouvelle conversation interrompt la réponse en cours (la conversation actuelle reste dans l'historique des sessions).", "Interrompre et recommencer")) return
         abandonTurn()
-        cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
+        suggestion = null; cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
         render(forceBottom = true)
         input.requestFocusInWindow()
     }
@@ -600,7 +643,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     fun loadSession(s: Session) {
         if (!confirmDiscard("Charger une autre session interrompt la réponse en cours.", "Interrompre et charger")) return
         abandonTurn()
-        cancelResume(); session = s; customTitle = null; allowAll = false; applyRemote(settings.state.remoteDefault)
+        suggestion = null; cancelResume(); session = s; customTitle = null; allowAll = false; applyRemote(settings.state.remoteDefault)
         resetUsage()
         render(forceBottom = true)
     }
@@ -771,6 +814,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val gen = ++generation
         idleTurn?.kill(); idleTurn = null // le nouveau message ouvre son propre processus
         turnStart = System.currentTimeMillis(); lastDurationMs = 0L; liveOut = 0; lastLimits = null
+        suggestion = null
         tick()
         val model = selectedModel.ifBlank { settings.state.model }
         settings.state.model = model
@@ -782,7 +826,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         forkNext = false
         val opts = TurnOptions(
             settings.cliPath(), cwd, model, effortChoices(model).let { if (selectedEffort in it) selectedEffort else "auto" }, currentMode(),
-            session.id, settings.state.system, emptyList(), fork, waitForMcp = true,
+            session.id, settings.state.system, emptyList(), fork, waitForMcp = true, suggestions = settings.state.promptSuggestions,
         )
         ApplicationManager.getApplication().executeOnPooledThread {
             val t = CliTurn(opts, content, listener(gen))
@@ -798,6 +842,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onInit(sessionId: String, model: String?) = ui(gen) { session.id = sessionId; activeModel = model ?: activeModel; updateStatus() }
         override fun onLiveUsage(contextTokens: Int, outputTokens: Int) = ui(gen) { liveCtx = contextTokens; liveOut = outputTokens; updateStatus() }
         override fun onRateLimits(limits: RateLimits) = ui(gen) { lastLimits = limits; applyLimits(limits) }
+        override fun onSuggestion(text: String) = ui(gen) { setSuggestion(text) }
         override fun onContextWindow(model: String, tokens: Int) = ui(gen) { contextWindows[model] = tokens; updateRing() }
         override fun onRefineLost(texts: List<String>) = ui(gen) {
             texts.forEach { body ->

@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **Suggestion du message suivant** : après une réponse, la CLI propose ce que vous écrirez probablement ensuite ; une ligne au-dessus du champ de saisie l'affiche, un clic (ou Tab dans le champ vide) l'insère. Désactivable dans les réglages (une petite requête en plus par réponse, environ 10 % de coût)
 - **Mode de permission appliqué tout de suite** : changer le mode (Demander, Modifs auto, Plan…) pendant que Claude travaille prend effet immédiatement, sans attendre le message suivant (sauf « Tout autoriser », que la CLI n'autorise pas en cours de session)
 - **Votre message épinglé en haut** : une ligne discrète reste visible au-dessus de la conversation, un clic l'affiche en entier. Si votre dernier message ne fait que demander de reprendre (« continue », « reprends là où tu t'étais arrêté », « recommence »…), c'est le message précédent, celui qui contient la tâche, qui est épinglé (repéré par ↻)
 - **Détail du contexte** : un clic sur l'anneau de contexte affiche la répartition mesurée par la CLI (prompt système, outils, skills, messages…, détail des messages, seuil de compaction automatique). Mesure exacte via le processus de la conversation, sinon estimation hors serveurs MCP

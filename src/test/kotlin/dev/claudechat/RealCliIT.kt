@@ -117,4 +117,29 @@ class RealCliIT {
         assertTrue(u.categories.any { it.id == "system_prompt" && it.tokens > 0 })
         assertTrue("Contexte :" in contextReportHtml(u))
     }
+
+    /** Suggestion de message suivant : événement `prompt_suggestion` de la vraie CLI, reçu après la fin de la réponse. */
+    @Test fun realTurnProposesNextMessage() {
+        val suggestion = java.util.concurrent.LinkedBlockingQueue<String>()
+        val done = CountDownLatch(1)
+        // les écritures de fichiers sont refusées : Claude termine en proposant d'agir autrement, ce qui appelle une suite
+        lateinit var turn: CliTurn
+        val l = object : TurnListener {
+            override fun onPermission(req: PermissionRequest) { turn.deny(req.requestId, "refusé par le test") }
+            override fun onSuggestion(text: String) { suggestion.add(text) }
+            override fun onDone(isError: Boolean, message: String?) { done.countDown() }
+        }
+        val content = JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", "Crée une petite API REST en Kotlin avec Ktor : explique les étapes en 5 lignes.") }) }
+        val t = CliTurn(TurnOptions(ClaudeSettings.defaultCli(), System.getProperty("java.io.tmpdir"), "claude-haiku-5-5", "auto", "manual", null, "", emptyList(), suggestions = true), content, l)
+        turn = t
+        t.start()
+        try {
+            assertTrue(done.await(90, TimeUnit.SECONDS))
+            val s = suggestion.poll(30, TimeUnit.SECONDS)
+            println("SUGGESTION: $s")
+            // la CLI ne propose pas toujours une suite : on ne vérifie le contenu que s'il y en a une
+            org.junit.jupiter.api.Assumptions.assumeTrue(s != null, "aucune suggestion proposée cette fois")
+            assertTrue(s!!.isNotBlank() && s.length <= 300 && '\n' !in s)
+        } finally { t.kill() }
+    }
 }
