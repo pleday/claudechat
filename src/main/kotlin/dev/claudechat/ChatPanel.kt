@@ -1182,21 +1182,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
     }
 
-    private fun decodeImage(img: Triple<String, String, String>): java.awt.image.BufferedImage? =
-        runCatching { javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(Base64.getDecoder().decode(img.third))) }.getOrNull()
-
-    private fun scaledIcon(bi: java.awt.image.BufferedImage, maxW: Int, maxH: Int): Icon {
-        val k = minOf(maxW.toDouble() / bi.width, maxH.toDouble() / bi.height, 1.0)
-        val w = (bi.width * k).toInt().coerceAtLeast(1); val h = (bi.height * k).toInt().coerceAtLeast(1)
-        return javax.swing.ImageIcon(bi.getScaledInstance(w, h, java.awt.Image.SCALE_SMOOTH))
-    }
-
     private fun thumbnail(img: Triple<String, String, String>): Icon? =
-        thumbCache[img] ?: decodeImage(img)?.let { scaledIcon(it, JBUI.scale(56), JBUI.scale(40)) }?.also { thumbCache[img] = it }
+        thumbCache[img] ?: Images.decode(img.third)?.let { Images.scaledIcon(it, JBUI.scale(56), JBUI.scale(40)) }?.also { thumbCache[img] = it }
 
     private fun showImagePreview(img: Triple<String, String, String>) {
-        val bi = decodeImage(img) ?: return
-        val label = JBLabel(scaledIcon(bi, JBUI.scale(560), JBUI.scale(420))).apply { border = JBUI.Borders.empty(6) }
+        val bi = Images.decode(img.third) ?: return
+        val label = JBLabel(Images.scaledIcon(bi, JBUI.scale(560), JBUI.scale(420))).apply { border = JBUI.Borders.empty(6) }
         JBPopupFactory.getInstance().createComponentPopupBuilder(label, null)
             .setTitle("${img.first} (${bi.width}×${bi.height})").setRequestFocus(true).setCancelOnClickOutside(true).setMovable(true)
             .createPopup().showInCenterOf(this)
@@ -1372,38 +1363,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         // du texte copié avec une image (tableur, page web) : c'est le texte qu'on veut coller
         if (tr.isDataFlavorSupported(textFlavor) &&
             runCatching { (tr.getTransferData(textFlavor) as? String).orEmpty().isNotBlank() }.getOrDefault(false)) return false
-        val png = clipboardImagePng(tr) ?: return false
+        val png = Images.clipboardPng(tr) ?: return false
         extraImages.add(Triple("image-${++pasteCount}.png", "image/png", Base64.getEncoder().encodeToString(png)))
         updateExtras()
         return true
-    }
-
-    /** Image du presse-papiers encodée en PNG : via `imageFlavor`, sinon via un format image (png, jpeg…) lu en flux (Wayland). */
-    private fun clipboardImagePng(tr: java.awt.datatransfer.Transferable): ByteArray? {
-        fun encode(img: java.awt.Image): ByteArray? {
-            val w = img.getWidth(null); val h = img.getHeight(null)
-            if (w <= 0 || h <= 0) return null
-            val bi = java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-            bi.createGraphics().apply { drawImage(img, 0, 0, null); dispose() }
-            return java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(bi, "png", it) }.toByteArray()
-        }
-        if (tr.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.imageFlavor)) {
-            (runCatching { tr.getTransferData(java.awt.datatransfer.DataFlavor.imageFlavor) as? java.awt.Image }
-                .onFailure { LOG.info("Collage : imageFlavor illisible : $it") }.getOrNull())?.let { encode(it)?.let { b -> return b } }
-        }
-        val streams = tr.transferDataFlavors.filter { it.primaryType == "image" }
-            .sortedBy { if (it.subType == "png") 0 else 1 }
-        for (f in streams) {
-            val data = runCatching { tr.getTransferData(f) }.onFailure { LOG.info("Collage : ${f.mimeType} illisible : $it") }.getOrNull()
-            val bytes = (data as? java.io.InputStream)?.use { it.readBytes() }
-            val img = when {
-                bytes != null -> runCatching { javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(bytes)) }.getOrNull()
-                data is java.awt.Image -> data
-                else -> null
-            }
-            if (img != null) encode(img)?.let { return it }
-        }
-        return null
     }
 
     private var projectFiles: List<String> = emptyList()
