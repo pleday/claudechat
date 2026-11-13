@@ -28,7 +28,9 @@ fun readTextOrNull(path: String, maxBytes: Long = 2L * 1024 * 1024): String? {
  * outil qui le modifie (Edit, Write, MultiEdit, NotebookEdit) : la comparaison montre ainsi tout ce que Claude a changé
  * depuis le début de la conversation, et pas seulement la dernière modification. L'état actuel est relu sur le disque.
  *
- * Les fichiers modifiés par des commandes (Bash : sed, git…) ne sont pas suivis : on ne sait pas lesquels avant coup.
+ * Les changements faits par des commandes (Bash, sous-agents, outils MCP) sont retrouvés après coup grâce à la photo du
+ * projet ([FsBaseline], [afterCommand]). Dans les deux cas, seul ce que Claude a fait est suivi : ni git, ni les modifications
+ * que l'utilisateur fait à la main n'interviennent (voir [startTurn]).
  */
 class ChangeTracker(
     private val cwd: () -> String,
@@ -51,10 +53,39 @@ class ChangeTracker(
         synchronized(this) { if (path !in before) before[path] = old }
     }
 
+    /**
+     * À appeler après une commande (Bash, sous-agent, outil MCP) exécutée entre [startMillis] et [endMillis] : retient les
+     * fichiers qu'elle a créés, modifiés ou supprimés, avec leur état d'avant. Un fichier déjà suivi garde son état initial.
+     */
+    fun afterCommand(baseline: FsBaseline, startMillis: Long, endMillis: Long) {
+        for (o in baseline.scan(startMillis, endMillis)) synchronized(this) { if (o.path !in before) before[o.path] = o.before }
+    }
+
+    // Contenu de chaque fichier suivi à la fin de la dernière réponse : si, au début de la suivante, il a changé, c'est que
+    // l'utilisateur l'a modifié entre-temps ; le suivi du fichier repart alors de son état actuel (sinon on lui attribuerait
+    // ses propres modifications).
+    private val settled = HashMap<String, String?>()
+
+    /** Fin d'une réponse : mémorise l'état des fichiers suivis. */
+    fun endTurn() {
+        val tracked = synchronized(this) { before.keys.toList() }
+        val now = tracked.associateWith { try { read(it) } catch (_: Exception) { return@associateWith SKIP } }
+        synchronized(this) { settled.clear(); now.forEach { (p, c) -> if (c !== SKIP) settled[p] = c } }
+    }
+
+    /** Début d'une réponse : oublie les fichiers que l'utilisateur a modifiés depuis la fin de la précédente. */
+    fun startTurn() {
+        val check = synchronized(this) { settled.toMap().also { settled.clear() } }
+        for ((path, content) in check) {
+            val now = try { read(path) } catch (_: Exception) { null }
+            if (now != content) synchronized(this) { before.remove(path) }
+        }
+    }
+
     val isEmpty: Boolean get() = synchronized(this) { before.isEmpty() }
 
     /** Oublie tout : les prochaines modifications repartent de l'état du disque à ce moment. */
-    fun clear() = synchronized(this) { before.clear() }
+    fun clear() = synchronized(this) { before.clear(); settled.clear() }
 
     /** Fichiers réellement différents de leur état initial (une modification refusée ou annulée n'apparaît pas). */
     fun changes(): List<ChangedFile> {
@@ -74,6 +105,7 @@ class ChangeTracker(
     }
 
     companion object {
+        private val SKIP = String()           // marqueur « fichier illisible » (comparé par identité)
         val TOOLS = setOf("Edit", "Write", "MultiEdit", "NotebookEdit")
     }
 }

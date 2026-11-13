@@ -334,6 +334,15 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     // Fichiers modifiés par Claude dans cette conversation (voir ChangeTracker) : ligne au-dessus du champ + fenêtre de la liste
     private val changeTracker = ChangeTracker({ cwd })
+    // Photo du projet prise avant chaque réponse : retrouve ce qu'une commande (Bash, sous-agent, outil MCP) a modifié (voir FsBaseline)
+    private val fsBaseline = FsBaseline(
+        { cwd },
+        skipDir = { it in GENERATED_DIRS },
+        skipFile = { FileTypeManager.getInstance().isFileIgnored(it) },
+    )
+    private val changeExec = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "claude-changes").apply { isDaemon = true } }
+    private val commandStarts = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val pendingScan = java.util.concurrent.atomic.AtomicReference<Pair<Long, Long>?>(null)
     @Volatile private var changedFiles: List<ChangedFile> = emptyList()
     private val changesLabel = JBLabel(AllIcons.Actions.Diff).apply {
         iconTextGap = JBUI.scale(4)
@@ -635,7 +644,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     @Volatile private var cliCommands: List<CliCommand> = emptyList()
 
-    fun shutdown() { idleTurn?.kill(); idleTurn = null; resumeAt = 0; RemoteBridge.unregister(phoneSink); abandonTurn() }
+    fun shutdown() { idleTurn?.kill(); idleTurn = null; resumeAt = 0; RemoteBridge.unregister(phoneSink); abandonTurn(); changeExec.shutdownNow() }
 
     // ---------- Barre d'outils ----------
 
@@ -835,6 +844,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         idleTurn?.kill(); idleTurn = null // le nouveau message ouvre son propre processus
         turnStart = System.currentTimeMillis(); lastDurationMs = 0L; liveOut = 0; lastLimits = null
         suggestion = null
+        // photo du projet avant que Claude agisse (hors EDT) ; les fichiers que l'utilisateur a modifiés depuis la réponse précédente repartent de zéro
+        changeExec.execute { runCatching { changeTracker.startTurn(); fsBaseline.capture() }.onFailure { LOG.warn("Photo du projet impossible : $it") } }
         tick()
         val model = selectedModel.ifBlank { settings.state.model }
         settings.state.model = model
@@ -879,6 +890,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onToolUse(id: String, name: String, input: JsonObject) {
             // état du fichier avant que l'outil s'exécute : lu tout de suite, sans attendre le passage sur l'EDT
             changeTracker.beforeEdit(name, input)
+            if (isCommandTool(name)) commandStarts[id] = System.currentTimeMillis()
             onToolUseUi(gen, id, name, input)
         }
         private fun onToolUseUi(gen: Int, id: String, name: String, input: JsonObject) = ui(gen) {
@@ -886,7 +898,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             if (session.entries.none { it.toolId == id }) session.entries.add(Entry(Kind.TOOL, toolId = id, toolName = name, input = input, model = activeModel))
             scheduleRender()
         }
-        override fun onToolResult(id: String, text: String, isError: Boolean) = ui(gen) {
+        override fun onToolResult(id: String, text: String, isError: Boolean) {
+            // une commande vient de se terminer : on cherche ce qu'elle a changé (fenêtre = durée de son exécution)
+            commandStarts.remove(id)?.let { requestCommandScan(it, System.currentTimeMillis()) }
+            onToolResultUi(gen, id, text, isError)
+        }
+        private fun onToolResultUi(gen: Int, id: String, text: String, isError: Boolean) = ui(gen) {
             val e = session.entries.firstOrNull { it.toolId == id }
             e?.result = text; e?.isError = isError
             if (e?.toolName?.let { it in WRITE_TOOLS } == true) { renderer.linker.invalidate(); scheduleRefresh(e); scheduleChangedFilesRefresh() }
@@ -935,6 +952,23 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     // ---------- Fichiers modifiés par Claude ----------
+
+    /** Outils qui peuvent toucher n'importe quel fichier sans le déclarer : commandes, sous-agents, outils MCP. */
+    private fun isCommandTool(name: String) = name == "Bash" || name == "Task" || name == "Agent" || name.startsWith("mcp__")
+
+    /**
+     * Demande l'analyse de ce que la commande a changé. Les demandes qui arrivent pendant qu'une analyse est en cours sont
+     * regroupées en une seule, sur la réunion de leurs fenêtres (un outil MCP rapide ne déclenche pas un parcours du disque chacun).
+     */
+    private fun requestCommandScan(start: Long, end: Long) {
+        val prev = pendingScan.getAndUpdate { cur -> if (cur == null) start to end else minOf(cur.first, start) to maxOf(cur.second, end) }
+        if (prev != null) return                              // une analyse est déjà prévue : elle prendra cette fenêtre aussi
+        changeExec.execute {
+            val w = pendingScan.getAndSet(null) ?: return@execute
+            runCatching { changeTracker.afterCommand(fsBaseline, w.first, w.second) }.onFailure { LOG.warn("Analyse des changements impossible : $it") }
+            ApplicationManager.getApplication().invokeLater({ scheduleChangedFilesRefresh() }, ModalityState.any())
+        }
+    }
 
     private fun scheduleChangedFilesRefresh() { alarm.cancelRequest(changesTask); alarm.addRequest(changesTask, 300) }
 
@@ -1161,6 +1195,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             scheduleResume(until * 1000)
             if (remoteOn) RemoteBridge.notifyPhone("⏸ [${project.name}] Quota atteint, reprise automatique prévue.")
         }
+        changeExec.execute { runCatching { changeTracker.endTurn() } }
         scheduleChangedFilesRefresh()
         if (!isError && !interrupted) scheduleTitleRefresh()
         if (settings.state.notify && !interrupted) Notifier.info(project, "Claude a terminé : ${session.title}")
@@ -1948,6 +1983,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
         const val MAX_RESUMES = 6
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ChatPanel::class.java)
+        /** Dossiers générés ou internes : jamais parcourus pour retrouver les changements d'une commande. */
+        val GENERATED_DIRS = setOf(
+            ".git", ".idea", ".gradle", ".kotlin", ".svn", ".hg", ".venv", "venv", "node_modules", "build", "out", "target", "dist",
+            ".next", "__pycache__", ".cache",
+        )
         val EDIT_TOOLS = setOf("Edit", "Write", "MultiEdit")
         val WRITE_TOOLS = setOf("Edit", "Write", "MultiEdit", "NotebookEdit", "Bash")
     }

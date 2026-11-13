@@ -142,4 +142,42 @@ class RealCliIT {
             assertTrue(s!!.isNotBlank() && s.length <= 300 && '\n' !in s)
         } finally { t.kill() }
     }
+
+    /**
+     * Une vraie commande Bash de Claude : fichier créé, modifié et supprimé. Même enchaînement que le panneau (photo avant la
+     * réponse, fenêtre = durée de la commande, analyse à son résultat), sans git.
+     */
+    @Test fun realBashChangesAreDetectedWithoutGit() {
+        val dir = java.nio.file.Files.createTempDirectory("claude-chat-it")
+        try {
+            java.nio.file.Files.writeString(dir.resolve("notes.txt"), "ligne un\nligne deux\n")
+            java.nio.file.Files.writeString(dir.resolve("a-supprimer.txt"), "temporaire\n")
+            java.nio.file.Files.writeString(dir.resolve("intact.txt"), "ne pas toucher\n")
+            val baseline = FsBaseline({ dir.toString() })
+            val tracker = ChangeTracker({ dir.toString() }, stats = { a, b -> LineDiff.stats(a, b, com.intellij.diff.comparison.ComparisonManagerImpl()) })
+            baseline.capture()
+            val starts = java.util.concurrent.ConcurrentHashMap<String, Long>()
+            val done = CountDownLatch(1)
+            val l = object : TurnListener {
+                override fun onToolUse(id: String, name: String, input: JsonObject) { if (name == "Bash") starts[id] = System.currentTimeMillis() }
+                override fun onToolResult(id: String, text: String, isError: Boolean) {
+                    starts.remove(id)?.let { tracker.afterCommand(baseline, it, System.currentTimeMillis()) }
+                }
+                override fun onDone(isError: Boolean, message: String?) { done.countDown() }
+            }
+            val prompt = "Utilise l'outil Bash une seule fois, avec exactement cette commande : " +
+                "echo 'créé par bash' > cree.txt && sed -i 's/deux/DEUX/' notes.txt && rm a-supprimer.txt . Puis réponds seulement : fait."
+            val content = JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", prompt) }) }
+            val t = CliTurn(TurnOptions(ClaudeSettings.defaultCli(), dir.toString(), "claude-haiku-5-5", "auto", "bypassPermissions", null, "", emptyList()), content, l)
+            t.start()
+            try { assertTrue(done.await(120, TimeUnit.SECONDS)) } finally { t.kill() }
+            val by = tracker.changes().associateBy { it.rel }
+            println("CHANGES: " + by.values.map { "${it.rel}:${it.status}+${it.added}-${it.removed}" })
+            assertEquals(setOf("cree.txt", "notes.txt", "a-supprimer.txt"), by.keys, "intact.txt ne doit pas apparaître")
+            assertEquals(ChangeStatus.NEW, by.getValue("cree.txt").status)
+            assertEquals(ChangeStatus.MODIFIED, by.getValue("notes.txt").status)
+            assertEquals("ligne un\nligne deux\n", by.getValue("notes.txt").before)
+            assertEquals(ChangeStatus.DELETED, by.getValue("a-supprimer.txt").status)
+        } finally { dir.toFile().deleteRecursively() }
+    }
 }

@@ -15,7 +15,7 @@ class ChatPanelInitOrderTest {
         val src = Files.readString(Path.of("src/main/kotlin/dev/claudechat/ChatPanel.kt"))
         val firstInit = src.indexOf("\n    init {")
         assertTrue(firstInit > 0)
-        for (field in listOf("renderer", "lastHtml", "codeTexts", "session", "searchQuery", "showThinking", "showTools", "stickyChoice", "stickyOpen", "stickyLabel", "stickyText", "stickyScroll", "stickyBar", "suggestion", "suggestLabel", "suggestRow", "changeTracker", "changedFiles", "changesLabel", "changesRow", "changesTask")) {
+        for (field in listOf("renderer", "lastHtml", "codeTexts", "session", "searchQuery", "showThinking", "showTools", "stickyChoice", "stickyOpen", "stickyLabel", "stickyText", "stickyScroll", "stickyBar", "suggestion", "suggestLabel", "suggestRow", "changeTracker", "changedFiles", "changesLabel", "changesRow", "changesTask", "fsBaseline", "changeExec", "commandStarts", "pendingScan")) {
             val decl = Regex("""\n    (?:@\w+ )?private (?:val|var) $field\b""").find(src)?.range?.first ?: -1
             assertTrue(decl in 1 until firstInit, "« $field » doit être déclaré avant le premier bloc init (position $decl, init à $firstInit)")
         }
