@@ -708,7 +708,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onToolResult(id: String, text: String, isError: Boolean) = ui(gen) {
             val e = session.entries.firstOrNull { it.toolId == id }
             e?.result = text; e?.isError = isError
-            if (e?.toolName?.let { it in WRITE_TOOLS } == true) { linker.invalidate(); refreshFiles() }
+            if (e?.toolName?.let { it in WRITE_TOOLS } == true) { linker.invalidate(); scheduleRefresh(e) }
             scheduleRender()
         }
         override fun onPermission(req: PermissionRequest) = ui(gen) {
@@ -1113,9 +1113,34 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     /** FR-34 : les fichiers modifiés par Claude sont rechargés dans l'éditeur. */
+    private val dirtyPaths = LinkedHashSet<String>()
+    private var dirtyAll = false
+    private val refreshTask = Runnable { refreshFiles() }
+
+    /**
+     * Regroupe les rafraîchissements : une rafale d'outils (Bash, Edit…) ne déclenche qu'un seul passage.
+     * Édition d'un fichier connu : seul ce fichier est rechargé ; Bash et le reste : tout le projet.
+     */
+    private fun scheduleRefresh(e: Entry) {
+        val path = if (e.toolName in EDIT_TOOLS) e.input?.let { filePathOf(it) } else null
+        if (path != null) dirtyPaths.add(path) else dirtyAll = true
+        alarm.cancelRequest(refreshTask)
+        alarm.addRequest(refreshTask, 700)
+    }
+
     private fun refreshFiles() {
-        val root = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) } ?: return
-        VfsUtil.markDirtyAndRefresh(true, true, true, root)
+        val all = dirtyAll
+        val paths = dirtyPaths.toList()
+        dirtyAll = false; dirtyPaths.clear()
+        if (all) {
+            val root = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) } ?: return
+            VfsUtil.markDirtyAndRefresh(true, true, true, root)
+        } else if (paths.isNotEmpty()) {
+            val fs = LocalFileSystem.getInstance()
+            // le fichier peut être nouveau : on rafraîchit aussi son dossier parent
+            val files = paths.mapNotNull { fs.refreshAndFindFileByPath(it) }
+            if (files.isNotEmpty()) VfsUtil.markDirtyAndRefresh(true, false, false, *files.toTypedArray())
+        }
     }
 
     // ---------- Contexte ----------
@@ -1388,6 +1413,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var projectFiles: List<String> = emptyList()
     private var mentionPopup: com.intellij.openapi.ui.popup.JBPopup? = null
 
+    /** Recherche floue débouncée et hors EDT : jusqu'à 50 000 chemins à parcourir à chaque frappe. */
+    private val searchAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, parent)
+
     private var filesLoadedAt = 0L
     @Volatile private var filesLoading = false
 
@@ -1429,23 +1457,33 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun mentionChanged() {
         SwingUtilities.invokeLater {
             val slash = SlashToken.activeQuery(input.text, input.caretPosition)
-            if (slash != null) { showSlashPopup(slash); return@invokeLater }
+            if (slash != null) { searchAlarm.cancelAllRequests(); showSlashPopup(slash); return@invokeLater }
             val tok = Mentions.activeToken(input.text, input.caretPosition)
-            if (tok == null) { mentionPopup?.cancel(); mentionPopup = null; return@invokeLater }
+            if (tok == null) { searchAlarm.cancelAllRequests(); mentionPopup?.cancel(); mentionPopup = null; return@invokeLater }
             // liste préchargée à l'ouverture ; rafraîchie en tâche de fond si elle date (fichiers créés depuis)
             if (projectFiles.isEmpty() || System.currentTimeMillis() - filesLoadedAt > 60_000) loadProjectFiles()
-            // sans requête : fichiers ouverts puis récents (plus utile qu'un ordre alphabétique arbitraire)
-            val hits = if (tok.second.isEmpty()) recentFiles().ifEmpty { Fuzzy.search("", projectFiles, 15) }
-                else Fuzzy.search(tok.second, projectFiles, 15)
-            mentionPopup?.cancel()
-            if (hits.isEmpty()) return@invokeLater
-            val (start, _) = tok
-            showCompletion(hits.map { CompletionRow(it) }) { path ->
-                val t = input.text
-                val end = input.caretPosition.coerceAtMost(t.length)
-                input.text = t.substring(0, start) + "@" + path + " " + t.substring(end)
-                input.caretPosition = (start + path.length + 2).coerceAtMost(input.document.length)
+            val (start, query) = tok
+            fun show(hits: List<String>) {
+                mentionPopup?.cancel()
+                if (hits.isEmpty()) return
+                showCompletion(hits.map { CompletionRow(it) }) { path ->
+                    val t = input.text
+                    val end = input.caretPosition.coerceAtMost(t.length)
+                    input.text = t.substring(0, start) + "@" + path + " " + t.substring(end)
+                    input.caretPosition = (start + path.length + 2).coerceAtMost(input.document.length)
+                }
             }
+            searchAlarm.cancelAllRequests()
+            // sans requête : fichiers ouverts puis récents (plus utile qu'un ordre alphabétique arbitraire), immédiat
+            if (query.isEmpty()) { show(recentFiles().ifEmpty { Fuzzy.search("", projectFiles, 15) }); return@invokeLater }
+            val files = projectFiles
+            searchAlarm.addRequest({
+                val hits = Fuzzy.search(query, files, 15)
+                ApplicationManager.getApplication().invokeLater({
+                    // la saisie a pu changer pendant la recherche : résultat périmé, on l'ignore
+                    if (Mentions.activeToken(input.text, input.caretPosition) == tok) show(hits)
+                }, ModalityState.any())
+            }, 100)
         }
     }
 
