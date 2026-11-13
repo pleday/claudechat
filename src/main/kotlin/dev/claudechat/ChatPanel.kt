@@ -319,7 +319,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         toolTipText = "Joindre des fichiers ou des images, mentionner un fichier (@) ou une commande (/)"
     }
     private val modeButton = FlatButton(modeLabel(), AllIcons.Nodes.Locked) { showModeMenu(it) }.apply {
-        toolTipText = "Permissions : ce que Claude peut faire sans te demander (effectif au message suivant)"
+        toolTipText = "Permissions : ce que Claude peut faire sans te demander (appliqué tout de suite, sauf « Tout autoriser » : au message suivant)"
     }
     private val contextChip = FlatButton("", AllIcons.FileTypes.Any_type) { toggleContext() }
     private val modelButton = FlatButton("", null) { showModelMenu(it) }.apply {
@@ -358,10 +358,29 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun choice(text: String, desc: String?, selected: () -> Boolean, set: () -> Unit) = panelChoice(text, desc, selected, set)
 
+    /**
+     * Applique le mode tout de suite au processus de la conversation (réponse en cours ou récemment terminée) au lieu
+     * d'attendre le message suivant. La CLI refuse « Tout autoriser » pour une session lancée sans cette option : ce
+     * mode ne s'applique donc qu'au message suivant.
+     */
+    private fun applyModeNow(id: String) {
+        val live = turn ?: idleTurn ?: return
+        if (id == "bypassPermissions") {
+            if (streaming) { session.entries.add(Entry(Kind.NOTICE, "« Tout autoriser » sera appliqué au message suivant : la CLI ne le permet pas en cours de réponse.")); scheduleRender() }
+            return
+        }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val r = live.setPermissionMode(id)
+            if (r != null && !r.ok) ApplicationManager.getApplication().invokeLater({
+                Notifier.warn(project, "Mode non appliqué tout de suite (${r.error ?: "refusé"}) : il le sera au message suivant.")
+            }, ModalityState.any())
+        }
+    }
+
     private fun showModeMenu(anchor: java.awt.Component) {
         val g = DefaultActionGroup()
         PERMISSION_MODES.forEach { (id, label) ->
-            g.add(choice(label, PERMISSION_HELP[label], { selectedMode == id }) { selectedMode = id; modeButton.text = modeLabel(); saveChoices() })
+            g.add(choice(label, PERMISSION_HELP[label], { selectedMode == id }) { selectedMode = id; modeButton.text = modeLabel(); saveChoices(); applyModeNow(id) })
         }
         popupOf(g, anchor)
     }

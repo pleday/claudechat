@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **Mode de permission appliqué tout de suite** : changer le mode (Demander, Modifs auto, Plan…) pendant que Claude travaille prend effet immédiatement, sans attendre le message suivant (sauf « Tout autoriser », que la CLI n'autorise pas en cours de session)
 - **Votre message épinglé en haut** : une ligne discrète reste visible au-dessus de la conversation, un clic l'affiche en entier. Si votre dernier message ne fait que demander de reprendre (« continue », « reprends là où tu t'étais arrêté », « recommence »…), c'est le message précédent, celui qui contient la tâche, qui est épinglé (repéré par ↻)
 - **Détail du contexte** : un clic sur l'anneau de contexte affiche la répartition mesurée par la CLI (prompt système, outils, skills, messages…, détail des messages, seuil de compaction automatique). Mesure exacte via le processus de la conversation, sinon estimation hors serveurs MCP
 - **Modèles et niveaux d'effort lus depuis la CLI** : le menu du modèle propose ceux que la CLI annonce (nouveaux modèles, noms, descriptions en info-bulle, versions précédentes regroupées à part), et seuls les efforts acceptés par le modèle choisi sont proposés ; la liste figée ne sert plus que de secours

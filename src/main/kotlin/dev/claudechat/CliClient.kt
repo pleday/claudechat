@@ -36,6 +36,9 @@ fun parseRateLimits(j: JsonObject): RateLimits? {
 
 data class ProbeResult(val limits: RateLimits?, val error: String?)
 
+/** Réponse de la CLI à une requête de contrôle : [ok] (succès), [payload] (corps de la réponse) ou [error]. */
+data class ControlResult(val ok: Boolean, val payload: JsonObject?, val error: String?)
+
 /** Commande slash exposée par la CLI (natives, personnalisées, skills, plugins). */
 data class CliCommand(val name: String, val description: String)
 
@@ -190,7 +193,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                     }
                     "control_response" -> j["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.let { resp ->
                         resp["request_id"]?.asString?.let { rid ->
-                            pendingContext.remove(rid)?.complete(if (resp["subtype"]?.asString == "success") controlPayload(j) else null)
+                            pending.remove(rid)?.complete(ControlResult(resp["subtype"]?.asString == "success", controlPayload(j), resp["error"]?.takeIf { it.isJsonPrimitive }?.asString))
                         }
                         if (resp["request_id"]?.asString?.startsWith("mcp-wait") == true)
                             mcpStatus = resp["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("mcpServers")?.takeIf { it.isJsonArray }
@@ -279,24 +282,35 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
     @Synchronized private fun trySend(o: JsonObject): Boolean =
         runCatching { out!!.apply { write(o.toString()); newLine(); flush() } }.isSuccess
 
-    private val pendingContext = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CompletableFuture<JsonObject?>>()
-    private val contextSeq = java.util.concurrent.atomic.AtomicInteger()
+    private val pending = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CompletableFuture<ControlResult>>()
+    private val requestSeq = java.util.concurrent.atomic.AtomicInteger()
 
     /**
-     * Contexte de cette conversation, mesuré par le processus qui la porte (exact, serveurs MCP compris). Bloquant ;
-     * null si le processus est terminé, son entrée fermée, ou s'il ne répond pas dans [timeoutMs].
+     * Requête de contrôle sur le processus de cette conversation (mode, renommage, contexte…). Bloquant ; null si le
+     * processus est terminé ou son entrée fermée (rien n'a été envoyé), ou s'il ne répond pas dans [timeoutMs].
      */
-    fun contextUsage(timeoutMs: Long = 8_000): ContextUsage? {
+    fun request(subtype: String, fields: Map<String, String> = emptyMap(), timeoutMs: Long = 8_000): ControlResult? {
         if (killed || proc?.isAlive != true) return null
-        val id = "ctx-${contextSeq.incrementAndGet()}"
-        val f = java.util.concurrent.CompletableFuture<JsonObject?>()
-        pendingContext[id] = f
-        val sent = trySend(controlRequest(id, "get_context_usage"))
-        if (!sent) { pendingContext.remove(id); return null }
-        return try { f.get(timeoutMs, TimeUnit.MILLISECONDS)?.let(::parseContextUsage) }
-        catch (_: Exception) { null }
-        finally { pendingContext.remove(id) }
+        val id = "req-${requestSeq.incrementAndGet()}"
+        val f = java.util.concurrent.CompletableFuture<ControlResult>()
+        pending[id] = f
+        if (!trySend(controlRequest(id, subtype, fields))) { pending.remove(id); return null }
+        return try { f.get(timeoutMs, TimeUnit.MILLISECONDS) } catch (_: Exception) { null } finally { pending.remove(id) }
     }
+
+    /** Contexte de cette conversation, mesuré par le processus qui la porte (exact, serveurs MCP compris). */
+    fun contextUsage(timeoutMs: Long = 8_000): ContextUsage? =
+        request("get_context_usage", timeoutMs = timeoutMs)?.takeIf { it.ok }?.payload?.let(::parseContextUsage)
+
+    /**
+     * Change le mode de permission tout de suite, sans attendre le message suivant. null : aucun processus à qui le
+     * dire (le mode sera pris au prochain lancement). Un échec est dans [ControlResult.error] (la CLI refuse par
+     * exemple `bypassPermissions` pour une session lancée sans cette option).
+     */
+    fun setPermissionMode(mode: String): ControlResult? = request("set_permission_mode", mapOf("mode" to mode))
+
+    /** Renomme la session côté CLI (visible dans `claude --resume`) ; null si aucun processus ne tourne. */
+    fun renameSession(title: String): ControlResult? = request("rename_session", mapOf("title" to title))
 
     /**
      * Précise la consigne pendant que Claude travaille : le message est injecté au prochain point d'arrêt
@@ -388,9 +402,9 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                 ?: ProbeResult(null, err.toString().trim().ifEmpty { "la CLI n'a fourni aucune information de quota (compte API, proxy ou version sans cette donnée ?)" })
         } catch (e: Exception) { ProbeResult(null, "impossible de lancer la CLI : ${e.message}") }
 
-        private fun controlRequest(id: String, subtype: String) = JsonObject().apply {
+        private fun controlRequest(id: String, subtype: String, fields: Map<String, String> = emptyMap()) = JsonObject().apply {
             addProperty("type", "control_request"); addProperty("request_id", id)
-            add("request", JsonObject().apply { addProperty("subtype", subtype) })
+            add("request", JsonObject().apply { addProperty("subtype", subtype); fields.forEach { (k, v) -> addProperty(k, v) } })
         }
 
         /**
