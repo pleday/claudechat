@@ -1587,8 +1587,15 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val path = m.groupValues[1]
         val line = m.groupValues[2].toIntOrNull()?.minus(1) ?: 0
         val abs = if (path.startsWith("/")) path else "$cwd/$path"
-        val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(abs) ?: return
-        OpenFileDescriptor(project, vf, line.coerceAtLeast(0), 0).navigate(true)
+        val fs = LocalFileSystem.getInstance()
+        fun go(vf: com.intellij.openapi.vfs.VirtualFile) { OpenFileDescriptor(project, vf, line.coerceAtLeast(0), 0).navigate(true) }
+        // fichier déjà connu de l'IDE : ouverture directe ; sinon (créé depuis) le rafraîchissement se fait hors EDT,
+        // où il est autorisé (sur l'EDT, les IDE récents le refusent : exception « write-intent lock »)
+        fs.findFileByPath(abs)?.let { go(it); return }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val vf = fs.refreshAndFindFileByPath(abs) ?: return@executeOnPooledThread
+            ApplicationManager.getApplication().invokeLater({ go(vf) }, ModalityState.any())
+        }
     }
 
     // ---------- Rendu ----------
