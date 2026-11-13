@@ -186,7 +186,17 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             val original = actionMap.get(base)
             inputMap.put(KeyStroke.getKeyStroke(key), "claude-$dir")
             actionMap.put("claude-$dir", object : AbstractAction() {
-                override fun actionPerformed(e: ActionEvent?) { if (!completionKey(dir)) original?.actionPerformed(e) }
+                override fun actionPerformed(e: ActionEvent?) {
+                    if (completionKey(dir)) return
+                    // ↑ sur la 1re ligne / ↓ sur la dernière : historique des messages envoyés
+                    val caret = caretPosition
+                    val recalled = when {
+                        dir == "up" && !document.getText(0, caret).contains('\n') -> history.previous(text)
+                        dir == "down" && !document.getText(caret, document.length - caret).contains('\n') -> history.next(text)
+                        else -> null
+                    }
+                    if (recalled != null) { text = recalled; caretPosition = document.length } else original?.actionPerformed(e)
+                }
             })
         }
         inputMap.put(KeyStroke.getKeyStroke("shift ENTER"), "insert-break")
@@ -204,6 +214,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {}
         })
     }
+    private val history = InputHistory()
     private enum class SendMode { QUEUE, REFINE }
 
     /** Comportement du bouton / d'Entrée pendant une réponse (mémorisé). */
@@ -591,6 +602,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun send(mode: SendMode = busyMode) {
         val original = input.text.trim()
         if (original.isEmpty() && extraFiles.isEmpty() && extraImages.isEmpty()) return
+        history.add(original)
         input.text = ""
         if (streaming) {
             if (mode == SendMode.REFINE) refine(original) else { queue.add(original); updateQueue() }
