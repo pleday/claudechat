@@ -46,10 +46,10 @@ export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, a
     <div id="interaction" hidden></div>
     <div id="queue" hidden></div>
     <div id="hints" hidden></div>
-    <div id="statusrow"><span id="hourglass" hidden>⏳</span><span id="status"></span><span id="usage"></span></div>
+    <div id="statusrow"><span id="hourglass" hidden>⏳</span><span id="status"></span><span id="usage"></span><span id="ring" title="Contexte"></span>${btn('battery', '', 'Quota', 'fb')}</div>
     <div id="card">
       <div id="completion" hidden></div>
-      <textarea id="input" rows="1" placeholder="Demande quelque chose à Claude…  (@ fichier, / commande, Maj+Entrée : nouvelle ligne)" spellcheck="false"></textarea>
+      <textarea id="input" rows="1" placeholder="Demande à Claude…   @ fichier · / commande" spellcheck="false"></textarea>
       <div id="controls">
         ${btn('plus', '+', 'Joindre, mentionner, commandes', 'fb')}
         ${btn('modeBtn', '', 'Mode de permission', 'fb')}
@@ -57,8 +57,6 @@ export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, a
         <span class="grow"></span>
         ${btn('modelBtn', '', 'Modèle', 'fb')}
         ${btn('effortBtn', '', 'Niveau d\'effort', 'fb')}
-        <span id="ring" title="Contexte"></span>
-        ${btn('battery', '', 'Quota', 'fb')}
         ${btn('stop', '■', 'Interrompre (Échap)', 'round stop')}
         ${btn('busyMenu', '⌄', 'Que faire du message pendant la réponse ?', 'round')}
         ${btn('send', '➤', 'Envoyer (Entrée)', 'round send')}

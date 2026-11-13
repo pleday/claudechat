@@ -29,8 +29,17 @@ export interface RenderCtx {
   askFiles: (paths: string[]) => void;
 }
 
-/** `true` si l'entrée précédente est le début d'une réponse de Claude (affiche l'en-tête « Claude »). */
-export function startsResponse(prev: Entry | undefined): boolean { return !prev || prev.kind === 'user'; }
+/**
+ * `true` pour le premier texte d'une réponse de Claude (affiche l'en-tête « Claude ») : aucun autre texte entre le dernier
+ * message de l'utilisateur et lui. Réflexion et outils, qui peuvent être masqués, ne comptent pas.
+ */
+export function startsResponse(entries: Entry[], i: number): boolean {
+  for (let k = i - 1; k >= 0; k--) {
+    if (entries[k].kind === 'user') return true;
+    if (entries[k].kind === 'text') return false;
+  }
+  return true;
+}
 
 const copyBtn = (getText: () => string): HTMLButtonElement => {
   const b = el('button', 'copy', 'Copier');
@@ -91,7 +100,7 @@ function toolCard(e: Entry, ctx: RenderCtx): HTMLElement {
   head.append(el('b', undefined, `${status} ${e.toolName ?? '?'}`), document.createTextNode(' '));
   const p = filePathOf(input);
   if (p) {
-    const a = el('a', 'filelink', p.startsWith(ctx.cwd + '/') ? p.slice(ctx.cwd.length + 1) : p);
+    const a = el('a', 'filelink', ctx.cwd && p.startsWith(ctx.cwd + '/') ? p.slice(ctx.cwd.length + 1) : p);
     a.dataset.open = p;
     head.append(a);
   } else head.append(el('code', undefined, toolSummary(e.toolName ?? '?', input).slice(0, 200)));

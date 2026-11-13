@@ -46,7 +46,7 @@ const nearBottom = () => transcript.scrollHeight - transcript.scrollTop - transc
 const scrollBottom = () => { transcript.scrollTop = transcript.scrollHeight; };
 
 function nodeFor(i: number): HTMLElement {
-  return renderEntry(entries[i], entries[i].kind === 'text' && startsResponse(entries[i - 1]), ctx());
+  return renderEntry(entries[i], entries[i].kind === 'text' && startsResponse(entries, i), ctx());
 }
 
 function renderWelcome(): HTMLElement {
@@ -258,7 +258,7 @@ function drawControls(): void {
   eff.textContent = `${state.effort} ▾`;
   eff.hidden = state.efforts.length <= 1;
   const ctxBtn = $('ctxBtn');
-  ctxBtn.textContent = state.contextOn ? `📄 ${state.contextFile || 'fichier courant'}` : '📄 sans contexte';
+  ctxBtn.replaceChildren(el('span', undefined, '📄'), el('span', 'lbl', ` ${state.contextOn ? state.contextFile || 'fichier courant' : 'sans contexte'}`));
   ctxBtn.classList.toggle('off', !state.contextOn || !state.contextFile);
   ctxBtn.title = state.contextOn ? 'Le fichier ouvert (ou la sélection) est joint au message — cliquer pour désactiver' : 'Contexte de l\'éditeur désactivé — cliquer pour activer';
   $('remoteBtn').classList.toggle('on', state.remoteOn);
@@ -592,7 +592,9 @@ transcript.addEventListener('click', (e) => {
 // ---------- Messages de l'extension ----------
 
 function applyState(p: Partial<UiState>): void {
+  const cwdChanged = p.cwd !== undefined && p.cwd !== state.cwd;
   Object.assign(state, p);
+  if (cwdChanged && entries.length) renderAll(); // les chemins affichés sont raccourcis par rapport au projet
   const has = (...k: Array<keyof UiState>) => k.some((x) => x in p);
   if (has('mode', 'model', 'effort', 'efforts', 'models', 'busyMode', 'contextOn', 'contextFile', 'remoteOn', 'autoResumeOn', 'canFork', 'forkPending')) drawControls();
   if (has('streaming', 'statusText', 'statusTip', 'resume', 'ringPercent', 'ringTip', 'usageLine', 'canFork')) drawStatus();

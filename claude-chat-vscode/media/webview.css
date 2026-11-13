@@ -95,8 +95,8 @@ input:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .chip .x:hover { opacity: 1; }
 .thumb { height: 18px; border-radius: 3px; }
 
-#statusrow { display: flex; justify-content: space-between; gap: 8px; font-size: .88em; color: var(--vscode-descriptionForeground); min-height: 1.3em; }
-#status { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#statusrow { display: flex; align-items: center; gap: 6px; font-size: .88em; color: var(--vscode-descriptionForeground); min-height: 1.3em; }
+#status { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #hourglass { animation: spin 2s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -104,20 +104,20 @@ input:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 #card:focus-within { border-color: var(--accent); }
 #input { resize: none; border: none; background: transparent; padding: 2px 4px; max-height: 220px; width: 100%; }
 #input:focus { outline: none; }
-#controls { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
-.grow { flex: 1; }
-.fb { background: none; border: none; border-radius: 4px; padding: 1px 6px; font-size: .9em; color: var(--vscode-descriptionForeground); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#controls { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.grow { flex: 1 1 0; min-width: 2px; }
+.fb { flex: 0 1 auto; min-width: 0; background: none; border: none; border-radius: 4px; padding: 1px 6px; font-size: .9em; color: var(--vscode-descriptionForeground); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb:hover { background: var(--vscode-toolbar-hoverBackground); color: var(--vscode-foreground); }
 .fb.off { opacity: .55; }
 .fb.low { color: var(--vscode-errorForeground); }
-.round { border: none; border-radius: 50%; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--vscode-button-secondaryBackground); }
+.round { flex: none; border: none; border-radius: 50%; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--vscode-button-secondaryBackground); }
 .round.send { background: var(--accent); color: #fff; }
 .round.send:disabled { opacity: .4; cursor: default; }
 .round.stop { background: var(--vscode-errorForeground); color: #fff; }
 button[hidden], [hidden] { display: none !important; }
 
 /* anneau du contexte */
-#ring { --p: 0; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; margin: 0 4px; background: conic-gradient(var(--accent) calc(var(--p) * 1%), var(--vscode-panel-border, #8886) 0); -webkit-mask: radial-gradient(circle, transparent 4px, #000 5px); mask: radial-gradient(circle, transparent 4px, #000 5px); }
+#ring { --p: 0; flex: none; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; margin: 0 2px; background: conic-gradient(var(--accent) calc(var(--p) * 1%), var(--vscode-panel-border, #8886) 0); -webkit-mask: radial-gradient(circle, transparent 4px, #000 5px); mask: radial-gradient(circle, transparent 4px, #000 5px); }
 #ring.warn { background: conic-gradient(var(--vscode-errorForeground) calc(var(--p) * 1%), var(--vscode-panel-border, #8886) 0); }
 
 /* complétion et menus */
@@ -136,3 +136,9 @@ button[hidden], [hidden] { display: none !important; }
 .report td { padding: 0 6px 0 0; }
 .report td.num { text-align: right; }
 .report td.bar { color: var(--vscode-descriptionForeground); letter-spacing: -1px; }
+
+#usage { flex: none; white-space: nowrap; }
+#statusrow .fb { font-size: 1em; padding: 0 4px; }
+
+/* vue étroite : la pastille du fichier courant ne garde que son icône (le nom est dans l'info-bulle) */
+@media (max-width: 480px) { .fb.ctx .lbl { display: none; } }

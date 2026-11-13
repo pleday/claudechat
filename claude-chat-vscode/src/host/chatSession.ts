@@ -172,8 +172,8 @@ export class ChatSession implements RemoteSink {
 
   /** La webview vient de s'ouvrir (ou de se recharger) : lui renvoie tout. */
   sendAll(): void {
-    this.post({ t: 'entries', entries: this.session.entries });
     this.post({ t: 'state', patch: this.fullState() });
+    this.post({ t: 'entries', entries: this.session.entries });
   }
 
   private post(m: HostMsg): void { if (!this.disposed) this.env.post(m); }

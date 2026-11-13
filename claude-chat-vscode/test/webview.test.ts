@@ -267,6 +267,23 @@ describe('interface du webview', () => {
     $('thinkBtn').click(); $('toolsBtn').click();
   });
 
+  it('l\'en-tête « Claude » est sur le premier texte de la réponse, même après une réflexion', () => {
+    host({ t: 'entries', entries: [
+      { kind: 'user', text: 'q' }, { kind: 'thinking', text: 'hmm' }, { kind: 'text', text: 'un', model: 'claude-sonnet-5-5' },
+      { kind: 'tool', text: '', toolName: 'Read', toolId: 'r', input: {} }, { kind: 'text', text: 'deux' },
+      { kind: 'user', text: 'q2' }, { kind: 'text', text: 'trois' },
+    ] });
+    expect([...document.querySelectorAll('.entry.text')].map((e) => !!e.querySelector('.who.claude'))).toEqual([true, false, true]);
+  });
+
+  it('les chemins sont raccourcis dès que le dossier du projet est connu', () => {
+    host({ t: 'state', patch: { cwd: '' } });
+    host({ t: 'entries', entries: [{ kind: 'tool', text: '', toolName: 'Edit', toolId: 'e', input: { file_path: '/proj/src/x.ts' } }] });
+    expect(document.querySelector('.toolcard a')?.textContent).toBe('/proj/src/x.ts');
+    host({ t: 'state', patch: { cwd: '/proj' } });
+    expect(document.querySelector('.toolcard a')?.textContent).toBe('src/x.ts');
+  });
+
   it('nouvelle conversation : retour à l\'accueil', () => {
     host({ t: 'entries', entries: [] });
     expect(document.querySelector('.welcome')).not.toBeNull();
