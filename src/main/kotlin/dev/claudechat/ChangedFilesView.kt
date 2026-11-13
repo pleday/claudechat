@@ -3,15 +3,12 @@ package dev.claudechat
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectFileIndex
-import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.openapi.ui.DialogBuilder
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import com.intellij.openapi.vcs.changes.SimpleContentRevision
-import com.intellij.openapi.vcs.changes.ui.SimpleChangesBrowser
+import com.intellij.openapi.vcs.changes.ui.SimpleAsyncChangesBrowser
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.util.SlowOperations
 import com.intellij.vcsUtil.VcsUtil
 import javax.swing.AbstractAction
 import java.awt.event.ActionEvent
@@ -47,20 +44,12 @@ object ChangedFilesView {
         if (files.isEmpty()) return
         ApplicationManager.getApplication().executeOnPooledThread {
             val fs = LocalFileSystem.getInstance()
-            val known = files.mapNotNull { fs.refreshAndFindFileByPath(it.path) }
-            // L'arbre des changements consulte l'index de fichiers (module de chaque fichier) dans son constructeur. Un fichier
-            // tout juste créé le rend périmé : on le met à jour ici, hors EDT, où c'est permis et sans geler l'interface.
-            ApplicationManager.getApplication().runReadAction {
-                val index = ProjectFileIndex.getInstance(project)
-                known.forEach { index.getModuleForFile(it) }
-            }
+            files.forEach { fs.refreshAndFindFileByPath(it.path) }
             ApplicationManager.getApplication().invokeLater({
                 if (project.isDisposed) return@invokeLater
-                // garde-fou : si l'index a encore bougé entre-temps, l'IDE signalerait une « opération lente sur l'EDT » alors que
-                // ce code ne lui appartient pas (constructeur de SimpleChangesBrowser)
-                val browser = SlowOperations.allowSlowOperations(ThrowableComputable<SimpleChangesBrowser, RuntimeException> {
-                    SimpleChangesBrowser(project, toChanges(files))
-                })
+                // variante asynchrone : l'arbre est construit en arrière-plan (la version synchrone, dépréciée, consultait l'index
+                // de fichiers sur l'EDT et provoquait des erreurs « opération lente »)
+                val browser = SimpleAsyncChangesBrowser(project, false, false).also { it.setChangesToDisplay(toChanges(files)) }
                 DialogBuilder(project).apply {
                     setTitle("Fichiers modifiés par Claude")
                     setCenterPanel(browser)
