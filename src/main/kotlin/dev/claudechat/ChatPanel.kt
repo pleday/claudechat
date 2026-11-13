@@ -128,6 +128,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     // Messages empilés pendant que Claude travaille (FR-09)
     private val queue = mutableListOf<String>()
 
+    private val responseTexts = ArrayList<String>()
+    private val codeTexts = ArrayList<String>()
+    private var copyPayload: String? = null
+
     private val view = JEditorPane().apply {
         isEditable = false
         editorKit = HTMLEditorKitBuilder().withGapsBetweenParagraphs().build()
@@ -404,7 +408,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                 session.entries.add(Entry(Kind.NOTICE, "Fork : le prochain message démarre une nouvelle branche de cette conversation."))
                 render(forceBottom = true)
             })
-            add(action("Copier la dernière réponse", AllIcons.Actions.Copy) { copyLast() })
             add(toggle("Afficher la réflexion", AllIcons.Actions.Preview, { showThinking }) { showThinking = it; render() })
             add(toggle("Afficher les outils", AllIcons.Toolwindows.ToolWindowHierarchy, { showTools }) { showTools = it; render() })
             add(toggle("Reprendre automatiquement quand le quota est rempli (cet onglet)", AllIcons.Actions.Resume, { autoResumeOn }) {
@@ -492,9 +495,65 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         render(forceBottom = true)
     }
 
-    private fun copyLast() {
-        val last = session.entries.lastOrNull { it.kind == Kind.TEXT }?.text ?: return
-        CopyPasteManager.getInstance().setContents(StringSelection(last))
+    // ---------- Bouton « copier » au survol d'une réponse ----------
+
+    private val copyButton = JBLabel(AllIcons.Actions.Copy).apply {
+        toolTipText = "Copier la réponse"
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        border = JBUI.Borders.empty(3)
+        isOpaque = true
+        background = UIUtil.getPanelBackground()
+        isVisible = false
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                copyPayload?.let { CopyPasteManager.getInstance().setContents(StringSelection(it)) }
+                icon = AllIcons.Actions.Checked
+                javax.swing.Timer(1200) { icon = AllIcons.Actions.Copy }.apply { isRepeats = false; start() }
+            }
+            override fun mouseExited(e: java.awt.event.MouseEvent) { hideCopyIfOutside(SwingUtilities.convertPoint(this@apply, e.point, view)) }
+        })
+    }
+
+    init {
+        view.add(copyButton)
+        view.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
+            override fun mouseMoved(e: java.awt.event.MouseEvent) { updateCopyHover(e.point) }
+        })
+        view.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseExited(e: java.awt.event.MouseEvent) { hideCopyIfOutside(e.point) }
+        })
+    }
+    private fun hideCopyIfOutside(p: java.awt.Point) {
+        if (!copyButton.bounds.contains(p) && !view.bounds.let { java.awt.Rectangle(0, 0, it.width, it.height) }.contains(p)) {
+            copyButton.isVisible = false; copyPayload = null
+        }
+    }
+
+    /** Copiable au survol : les blocs de code et les citations (pas les phrases de commentaire de Claude). */
+    private fun updateCopyHover(p: java.awt.Point) {
+        val doc = view.document as? javax.swing.text.html.HTMLDocument ?: return
+        val off = view.viewToModel2D(p)
+        fun find(prefix: String, n: Int): Int = (0 until n).firstOrNull { i ->
+            doc.getElement("$prefix$i")?.let { off >= it.startOffset && off < it.endOffset } == true
+        } ?: -1
+        var el: javax.swing.text.Element? = null
+        var payload: String? = null
+        val c = find("code", codeTexts.size)
+        if (c >= 0) { el = doc.getElement("code$c"); payload = codeTexts[c] }
+
+        if (el == null || payload == null) {
+            if (!copyButton.bounds.contains(p)) { copyButton.isVisible = false; copyPayload = null }
+            return
+        }
+        val top = runCatching { view.modelToView2D(el.startOffset)?.bounds?.y }.getOrNull() ?: return
+        val bottom = runCatching { view.modelToView2D(maxOf(el.startOffset, el.endOffset - 1))?.bounds?.let { it.y + it.height } }.getOrNull() ?: return
+        val size = copyButton.preferredSize
+        val vis = view.visibleRect
+        val y = maxOf(top, minOf(vis.y + 4, bottom - size.height))
+        copyPayload = payload
+        copyButton.toolTipText = "Copier"
+        copyButton.setBounds(maxOf(0, vis.x + vis.width - size.width - 14), y, size.width, size.height)
+        copyButton.isVisible = true
     }
 
     private fun openSettings() {
@@ -1581,7 +1640,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         sb.append("a{color:${hex(link)};}")
         sb.append("</style></head><body>")
         var lastRole = ""
+        responseTexts.clear(); codeTexts.clear()
+        var respOpen = false
         for (e in session.entries) {
+            if (e.kind == Kind.USER && respOpen) { sb.append("</div>"); respOpen = false }
             when (e.kind) {
                 Kind.USER -> {
                     lastRole = "user"
@@ -1593,11 +1655,15 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                 }
                 else -> {
                     if (lastRole != "claude" && e.kind != Kind.NOTICE && e.kind != Kind.ERROR) {
+                        sb.append("<div id='resp${responseTexts.size}'>"); respOpen = true; responseTexts.add("")
                         sb.append(assistantHeader(hex(ACCENT), (e.model ?: activeModel)?.let { ModelCatalog.label(it) }, gap = lastRole != ""))
                         lastRole = "claude"
                     }
                     when (e.kind) {
-                        Kind.TEXT -> sb.append(linkify(Md.toHtml(e.text)))
+                        Kind.TEXT -> {
+                            sb.append(linkify(Md.toHtml(e.text, codeTexts)))
+                            if (responseTexts.isNotEmpty()) responseTexts[responseTexts.lastIndex] = (responseTexts.last() + "\n\n" + e.text).trim()
+                        }
                         Kind.THINKING -> if (showThinking) sb.append("<blockquote><font color='gray'><i>${esc(e.text).replace("\n", "<br/>")}</i></font></blockquote>")
                         Kind.TOOL -> if (showTools) sb.append(toolCard(e, codeBg))
                         Kind.NOTICE -> sb.append("<p><font color='gray'><i>${esc(e.text)}</i></font></p>")
@@ -1607,6 +1673,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                 }
             }
         }
+        if (respOpen) sb.append("</div>")
         if (streaming && session.entries.lastOrNull()?.kind == Kind.USER) sb.append("<p>…</p>")
         sb.append("</body></html>")
         return sb.toString()
