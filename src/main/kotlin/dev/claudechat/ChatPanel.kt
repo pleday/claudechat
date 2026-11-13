@@ -267,7 +267,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     /** Rond orange avec flèche (envoyer) ou carré (interrompre) ; le menu mémorise « file d'attente » ou « préciser ». */
     private fun syncSend() {
-        updateSuggestRow()
+        updateHints()
         val blank = input.text.isBlank() && extraFiles.isEmpty() && extraImages.isEmpty()
         val menu = listOf(
             SplitItem("Mettre en file d'attente", AllIcons.Actions.MoveDown, "Envoyé quand la réponse en cours est terminée", busyMode == SendMode.QUEUE) { setBusyMode(SendMode.QUEUE) },
@@ -282,18 +282,36 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
     }
 
-    private fun setSuggestion(text: String?) { suggestion = text; updateSuggestRow() }
+    private fun setSuggestion(text: String?) { suggestion = text; updateHints() }
 
-    /** Visible seulement quand Claude a fini et que le champ est vide : sinon elle gênerait la frappe. */
-    private fun updateSuggestRow() {
-        val s = suggestion
-        val show = s != null && !streaming && input.text.isBlank()
-        val text = if (show) "Suggestion : " + s!!.replace(Regex("\\s+"), " ").take(160) else ""
-        if (show != suggestRow.isVisible || text != suggestLabel.text) {
-            suggestLabel.text = text
-            suggestRow.isVisible = show
-            suggestRow.revalidate(); suggestRow.repaint()
+    private fun colorHex(c: java.awt.Color) = "#%02x%02x%02x".format(c.red, c.green, c.blue)
+
+    /**
+     * Reconstruit les pastilles du haut de la saisie, seulement si leur contenu a changé. La suggestion n'est montrée que
+     * quand Claude a fini et que le champ est vide (sinon elle gênerait la frappe) ; les fichiers modifiés restent visibles.
+     */
+    private fun updateHints() {
+        val files = changedFiles
+        val sugg = suggestion?.takeIf { !streaming && input.text.isBlank() }
+        val key = (if (files.isEmpty()) "" else "${files.size}|${files.sumOf { it.added }}|${files.sumOf { it.removed }}") + "#" + (sugg ?: "")
+        if (key == hintsKey) return
+        hintsKey = key
+        hintsStrip.removeAll()
+        if (files.isNotEmpty()) {
+            val n = files.size
+            val text = "<html>$n fichier${if (n > 1) "s" else ""} modifié${if (n > 1) "s" else ""}&nbsp; " +
+                "<font color='${colorHex(ADDED)}'>+${files.sumOf { it.added }}</font> <font color='${colorHex(REMOVED)}'>−${files.sumOf { it.removed }}</font></html>"
+            hintsStrip.add(chip(AllIcons.Actions.Diff, text, ChangedFilesView.summary(files) + " — cliquer pour comparer avec l'état avant Claude",
+                { showChangedFiles() }, "Oublier ces modifications") { clearChangedFiles() })
         }
+        if (sugg != null) {
+            val shown = sugg.replace(Regex("\\s+"), " ").let { if (it.length > 70) it.take(69) + "…" else it }
+            val text = "<html>${esc(shown)}&nbsp; <font color='${colorHex(UIUtil.getContextHelpForeground())}'>Tab</font></html>"
+            hintsStrip.add(chip(AllIcons.Actions.IntentionBulb, text, "Suggestion de la suite : $sugg (clic ou Tab dans le champ vide)",
+                { acceptSuggestion() }, "Ignorer la suggestion") { setSuggestion(null) })
+        }
+        hintsStrip.isVisible = hintsStrip.componentCount > 0
+        hintsStrip.revalidate(); hintsStrip.repaint()
     }
 
     /** Insère la suggestion dans le champ vide ; false s'il n'y en a pas ou si le champ contient déjà du texte. */
@@ -344,39 +362,16 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private val commandStarts = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val pendingScan = java.util.concurrent.atomic.AtomicReference<Pair<Long, Long>?>(null)
     @Volatile private var changedFiles: List<ChangedFile> = emptyList()
-    private val changesLabel = JBLabel(AllIcons.Actions.Diff).apply {
-        iconTextGap = JBUI.scale(4)
-        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
-        toolTipText = "Voir les fichiers modifiés par Claude et les ouvrir dans la comparaison de l'IDE"
-        addMouseListener(object : java.awt.event.MouseAdapter() {
-            override fun mouseClicked(e: java.awt.event.MouseEvent) { showChangedFiles() }
-        })
+    // Pastilles contextuelles au-dessus du champ de saisie, sur une seule rangée alignée à gauche : fichiers modifiés par Claude
+    // et suggestion du message suivant (voir updateHints). Même style que les pièces jointes.
+    private val hintsStrip = JPanel(WrapFlowLayout(FlowLayout.LEFT, 4, 2)).apply {
+        isOpaque = false; isVisible = false; alignmentX = java.awt.Component.LEFT_ALIGNMENT
     }
-    private val changesRow = JPanel(BorderLayout()).apply {
-        isVisible = false
-        border = JBUI.Borders.empty(0, 6)
-        add(changesLabel, BorderLayout.CENTER)
-        add(ActionLink("effacer").apply { toolTipText = "Oublier ces modifications"; addActionListener { clearChangedFiles() } }, BorderLayout.EAST)
-    }
+    private var hintsKey = ""
     private val changesTask = Runnable { refreshChangedFiles() }
 
     // Suggestion du message suivant proposée par la CLI (--prompt-suggestions) : un clic, ou Tab dans le champ vide, l'insère
     private var suggestion: String? = null
-    private val suggestLabel = JBLabel(AllIcons.Actions.IntentionBulb).apply {
-        foreground = UIUtil.getContextHelpForeground()
-        iconTextGap = JBUI.scale(4)
-        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
-        toolTipText = "Cliquer (ou Tab dans le champ vide) pour utiliser cette suggestion"
-        addMouseListener(object : java.awt.event.MouseAdapter() {
-            override fun mouseClicked(e: java.awt.event.MouseEvent) { acceptSuggestion() }
-        })
-    }
-    private val suggestRow = JPanel(BorderLayout()).apply {
-        isVisible = false
-        border = JBUI.Borders.empty(0, 6)
-        add(suggestLabel, BorderLayout.CENTER)
-        add(ActionLink("×").apply { toolTipText = "Ignorer"; addActionListener { setSuggestion(null) } }, BorderLayout.EAST)
-    }
     // Modèle, effort et permissions : état + boutons plats (menus au-dessus de la carte de saisie)
     private var selectedModel = ModelCatalog.resolve(settings.state.model)
     private var selectedEffort = settings.state.effort
@@ -596,7 +591,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val topRows = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
-            add(extrasRow); add(queueRow); add(changesRow); add(suggestRow)
+            add(extrasRow); add(queueRow); add(hintsStrip)
         }
         val bottom = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(2, 6, 6, 6)
@@ -974,21 +969,14 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     /** Relit l'état des fichiers suivis (hors EDT : accès disque et calcul des différences) puis met la ligne à jour. */
     private fun refreshChangedFiles() {
-        if (changeTracker.isEmpty) { changedFiles = emptyList(); updateChangesRow(); return }
+        if (changeTracker.isEmpty) { changedFiles = emptyList(); updateHints(); return }
         ApplicationManager.getApplication().executeOnPooledThread {
             val list = changeTracker.changes()
-            ApplicationManager.getApplication().invokeLater({ changedFiles = list; updateChangesRow() }, ModalityState.any())
+            ApplicationManager.getApplication().invokeLater({ changedFiles = list; updateHints() }, ModalityState.any())
         }
     }
 
-    private fun updateChangesRow() {
-        val files = changedFiles
-        changesRow.isVisible = files.isNotEmpty()
-        changesLabel.text = if (files.isEmpty()) "" else ChangedFilesView.summary(files) + " — voir"
-        changesRow.revalidate(); changesRow.repaint()
-    }
-
-    private fun clearChangedFiles() { changeTracker.clear(); changedFiles = emptyList(); updateChangesRow() }
+    private fun clearChangedFiles() { changeTracker.clear(); changedFiles = emptyList(); updateHints() }
 
     private fun showChangedFiles() {
         val files = changedFiles
@@ -1477,7 +1465,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         syncSend()
     }
 
-    private fun attachmentChip(icon: Icon?, text: String, tip: String, onClick: (() -> Unit)?, onRemove: () -> Unit): JComponent {
+    private fun attachmentChip(icon: Icon?, text: String, tip: String, onClick: (() -> Unit)?, onRemove: () -> Unit): JComponent =
+        chip(icon, text, tip, onClick, "Retirer", onRemove)
+
+    /** Pastille : icône, texte (cliquable si [onClick]), croix de retrait. Sert aux pièces jointes et aux indices du haut de la saisie. */
+    private fun chip(icon: Icon?, text: String, tip: String, onClick: (() -> Unit)?, removeTip: String, onRemove: () -> Unit): JComponent {
         val hand = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
         val label = JBLabel(text, icon, SwingConstants.LEFT).apply {
             toolTipText = tip; iconTextGap = JBUI.scale(5)
@@ -1487,7 +1479,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             }
         }
         val remove = JBLabel(AllIcons.Actions.Close).apply {
-            toolTipText = "Retirer"; cursor = hand
+            toolTipText = removeTip; cursor = hand
             addMouseListener(object : java.awt.event.MouseAdapter() { override fun mouseClicked(e: java.awt.event.MouseEvent) { onRemove() } })
         }
         return JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
@@ -1984,6 +1976,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         const val MAX_RESUMES = 6
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ChatPanel::class.java)
         /** Dossiers générés ou internes : jamais parcourus pour retrouver les changements d'une commande. */
+        /** Lignes ajoutées / retirées. */
+        val ADDED = JBColor(Color(0x2E7D32), Color(0x6AAB73))
+        val REMOVED = JBColor(Color(0xC62828), Color(0xE57373))
         val GENERATED_DIRS = setOf(
             ".git", ".idea", ".gradle", ".kotlin", ".svn", ".hg", ".venv", "venv", "node_modules", "build", "out", "target", "dist",
             ".next", "__pycache__", ".cache",
