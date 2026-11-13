@@ -1,0 +1,213 @@
+{
+ "_doc": "Serveurs MCP : sortie de `claude mcp list` et normalisation de la configuration. status : connected | needs_auth | failed | pending.",
+ "parseList": [
+  {
+   "in": "Checking MCP server health...\n\nidea: http://localhost:64342/stream (HTTP) - ✓ Connected\nsonar: npx sonar - ✗ Failed to connect\nclaude.ai Gmail: https://x - ! Needs authentication\nlent: node x.js (stdio) - … Pending\nvide\nsans-tiret: x",
+   "out": [
+    {
+     "name": "idea",
+     "target": "http://localhost:64342/stream",
+     "type": "http",
+     "status": "connected"
+    },
+    {
+     "name": "sonar",
+     "target": "npx sonar",
+     "status": "failed"
+    },
+    {
+     "name": "claude.ai Gmail",
+     "target": "https://x",
+     "status": "needs_auth"
+    },
+    {
+     "name": "lent",
+     "target": "node x.js",
+     "type": "stdio",
+     "status": "pending"
+    }
+   ]
+  },
+  {
+   "in": "",
+   "out": []
+  }
+ ],
+ "statusOf": [
+  {
+   "in": "✓ Connected",
+   "out": "connected"
+  },
+  {
+   "in": "✗ Failed to connect",
+   "out": "failed"
+  },
+  {
+   "in": "! Needs authentication",
+   "out": "needs_auth"
+  },
+  {
+   "in": "Pending",
+   "out": "pending"
+  },
+  {
+   "in": "Error: boom",
+   "out": "failed"
+  },
+  {
+   "in": "???",
+   "out": "failed"
+  }
+ ],
+ "mask": [
+  {
+   "in": "Bearer abc",
+   "out": "Bearer ••••••"
+  },
+  {
+   "in": "Basic x y",
+   "out": "Basic ••••••"
+  },
+  {
+   "in": "secret",
+   "out": "••••••"
+  },
+  {
+   "in": "Bearer",
+   "out": "••••••"
+  },
+  {
+   "in": "Token t",
+   "out": "Token ••••••"
+  }
+ ],
+ "normalize": [
+  {
+   "in": {
+    "text": "{\"mcpServers\":{\"a\":{\"command\":\"x\"}}}",
+    "name": ""
+   },
+   "out": {
+    "servers": [
+     [
+      "a",
+      {
+       "command": "x"
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "in": {
+    "text": "{\"a\":{\"url\":\"u\"},\"b\":{\"command\":\"c\"}}",
+    "name": ""
+   },
+   "out": {
+    "servers": [
+     [
+      "a",
+      {
+       "url": "u"
+      }
+     ],
+     [
+      "b",
+      {
+       "command": "c"
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "in": {
+    "text": "{\"command\":\"x\",\"args\":[\"1\"]}",
+    "name": "srv"
+   },
+   "out": {
+    "servers": [
+     [
+      "srv",
+      {
+       "command": "x",
+       "args": [
+        "1"
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "in": {
+    "text": "{\"command\":\"x\"}",
+    "name": ""
+   },
+   "out": {
+    "servers": [],
+    "error": "Donne un nom au serveur (champ « Nom »)."
+   }
+  },
+  {
+   "in": {
+    "text": "{\"command\":\"x\"}",
+    "name": "bad name"
+   },
+   "out": {
+    "servers": [],
+    "error": "Nom invalide : lettres, chiffres, « - », « _ » et « . » uniquement."
+   }
+  },
+  {
+   "in": {
+    "text": "[]",
+    "name": "x"
+   },
+   "out": {
+    "servers": [],
+    "error": "La configuration doit être un objet JSON."
+   }
+  },
+  {
+   "in": {
+    "text": "{\"mcpServers\":{}}",
+    "name": "x"
+   },
+   "out": {
+    "servers": [],
+    "error": "« mcpServers » est vide."
+   }
+  },
+  {
+   "in": {
+    "text": "{\"mcpServers\":{\"a\":{\"foo\":1}}}",
+    "name": "x"
+   },
+   "out": {
+    "servers": [],
+    "error": "Le serveur « a » n'a ni « command » ni « url »."
+   }
+  },
+  {
+   "in": {
+    "text": "{\"truc\":1}",
+    "name": "x"
+   },
+   "out": {
+    "servers": [],
+    "error": "Aucun serveur trouvé : attendu « command » (stdio) ou « url » (http / sse)."
+   }
+  },
+  {
+   "in": {
+    "text": "{\"mcpServers\":{\"bad name\":{\"command\":\"x\"}}}",
+    "name": "x"
+   },
+   "out": {
+    "servers": [],
+    "error": "Nom de serveur invalide : « bad name »."
+   }
+  }
+ ]
+}

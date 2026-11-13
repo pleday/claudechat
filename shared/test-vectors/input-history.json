@@ -1,0 +1,112 @@
+{
+ "_doc": "Scénarios : max (taille), ops = add(text) | previous(current)->out | next(current)->out",
+ "scenarios": [
+  {
+   "max": 50,
+   "ops": [
+    {
+     "op": "add",
+     "text": "un"
+    },
+    {
+     "op": "add",
+     "text": "deux"
+    },
+    {
+     "op": "add",
+     "text": "deux"
+    },
+    {
+     "op": "previous",
+     "current": "brouillon",
+     "out": "deux"
+    },
+    {
+     "op": "previous",
+     "current": "deux",
+     "out": "un"
+    },
+    {
+     "op": "previous",
+     "current": "un",
+     "out": null
+    },
+    {
+     "op": "next",
+     "current": "un",
+     "out": "deux"
+    },
+    {
+     "op": "next",
+     "current": "deux",
+     "out": "brouillon"
+    },
+    {
+     "op": "next",
+     "current": "brouillon",
+     "out": null
+    }
+   ]
+  },
+  {
+   "max": 2,
+   "ops": [
+    {
+     "op": "add",
+     "text": "a"
+    },
+    {
+     "op": "add",
+     "text": "b"
+    },
+    {
+     "op": "add",
+     "text": "c"
+    },
+    {
+     "op": "previous",
+     "current": "",
+     "out": "c"
+    },
+    {
+     "op": "previous",
+     "current": "c",
+     "out": "b"
+    },
+    {
+     "op": "previous",
+     "current": "b",
+     "out": null
+    }
+   ]
+  },
+  {
+   "max": 5,
+   "ops": [
+    {
+     "op": "add",
+     "text": "  "
+    },
+    {
+     "op": "previous",
+     "current": "x",
+     "out": null
+    },
+    {
+     "op": "add",
+     "text": "m"
+    },
+    {
+     "op": "previous",
+     "current": "x",
+     "out": "m"
+    },
+    {
+     "op": "next",
+     "current": "modifié",
+     "out": null
+    }
+   ]
+  }
+ ]
+}

@@ -36,6 +36,9 @@ tasks.test {
 
 kotlin { jvmToolchain(21) }
 
+// Vecteurs de test communs avec l'extension VS Code (../shared/test-vectors), lus par VectorsTest.
+tasks.processTestResources { from("../shared/test-vectors") { into("vectors") } }
+
 // Ressources communes avec l'extension VS Code (../shared) : icône, avatar, astuces et catalogue des commandes slash.
 tasks.processResources {
     from("../shared/data") { into("shared") }

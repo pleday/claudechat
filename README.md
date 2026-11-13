@@ -16,8 +16,8 @@ reprenables, quotas, MCP, accès à distance par Telegram : voir le README de ch
 Kotlin (JVM) et TypeScript ne peuvent pas partager de code ; on mutualise donc ce qui est **données** :
 
 - `shared/assets` — icône, icônes du plugin, avatar de l'écran d'accueil ;
-- `shared/data/tips.json` — astuces de l'écran d'accueil ;
-- `shared/data/slash-commands.json` — catégories, descriptions et raccourcis des commandes `/` ;
+- `shared/data` — `constants.json` (modes de permission, efforts, modèles de secours, prompts `/explain`… et du message de commit, dossiers ignorés, seuils), `tips.json`, `slash-commands.json` ;
+- `shared/test-vectors` — cas « entrée → sortie » du comportement métier (message épinglé, quotas, mentions, analyse des réponses de la CLI, MCP, transcript…) exécutés par **les deux** suites de tests : un écart de comportement entre les éditeurs fait échouer un test (voir `shared/README.md`) ;
 - le **dossier de données** `~/.claude-code-gui` (titres et archives des sessions) et les sessions de la CLI (`~/.claude/projects`) : une conversation commencée dans l'un des deux éditeurs se reprend dans l'autre.
 
 Chaque build copie ces fichiers dans ses propres ressources (Gradle `processResources`, `esbuild.mjs`) : on n'édite jamais les copies.

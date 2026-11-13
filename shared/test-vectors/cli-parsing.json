@@ -1,0 +1,357 @@
+{
+ "_doc": "Analyse des réponses de la CLI. Les propriétés nulles et absentes sont équivalentes.",
+ "rateLimits": [
+  {
+   "in": {
+    "rate_limit_info": {
+     "status": "allowed",
+     "unifiedWindows": {
+      "five_hour": {
+       "utilization": 0.4,
+       "resetsAt": 100
+      },
+      "seven_day": {
+       "utilization": 0.1,
+       "resetsAt": 200
+      }
+     }
+    }
+   },
+   "out": {
+    "fiveHour": {
+     "utilization": 0.4,
+     "resetsAt": 100
+    },
+    "sevenDay": {
+     "utilization": 0.1,
+     "resetsAt": 200
+    },
+    "status": "allowed"
+   }
+  },
+  {
+   "in": {
+    "rate_limit_info": {
+     "status": "rejected",
+     "rateLimitType": "five_hour",
+     "resetsAt": 5
+    }
+   },
+   "out": {
+    "status": "rejected",
+    "limitType": "five_hour",
+    "resetsAt": 5
+   }
+  },
+  {
+   "in": {
+    "rate_limit_info": {
+     "status": "allowed"
+    }
+   },
+   "out": null
+  },
+  {
+   "in": {},
+   "out": null
+  },
+  {
+   "in": {
+    "rate_limit_info": {
+     "unifiedWindows": {
+      "five_hour": {
+       "utilization": 0.9
+      }
+     }
+    }
+   },
+   "out": {
+    "fiveHour": {
+     "utilization": 0.9,
+     "resetsAt": 0
+    }
+   }
+  },
+  {
+   "in": {
+    "rate_limit_info": {
+     "unifiedWindows": {
+      "seven_day": {
+       "resetsAt": 3
+      }
+     }
+    }
+   },
+   "out": null
+  }
+ ],
+ "models": [
+  {
+   "in": {
+    "response": {
+     "subtype": "success",
+     "response": {
+      "models": [
+       {
+        "value": "default",
+        "displayName": "Default"
+       },
+       {
+        "value": "sonnet",
+        "resolvedModel": "claude-sonnet-5-5",
+        "displayName": "Sonnet 5.5",
+        "description": "d",
+        "supportsEffort": true,
+        "supportedEffortLevels": [
+         "low",
+         "high"
+        ]
+       },
+       {
+        "value": "claude-sonnet-5-5",
+        "resolvedModel": "claude-sonnet-5-5"
+       },
+       {
+        "value": "haiku",
+        "displayName": "Haiku",
+        "supportsEffort": false,
+        "supportedEffortLevels": [
+         "low"
+        ]
+       },
+       {
+        "value": "opus",
+        "resolvedModel": "claude-opus-4-6",
+        "supportsEffort": true
+       },
+       "bizarre",
+       {
+        "value": ""
+       }
+      ]
+     }
+    }
+   },
+   "out": [
+    {
+     "id": "claude-sonnet-5-5",
+     "alias": "sonnet",
+     "name": "Sonnet 5.5",
+     "description": "d",
+     "efforts": [
+      "low",
+      "high"
+     ]
+    },
+    {
+     "id": "haiku",
+     "alias": "haiku",
+     "name": "Haiku",
+     "description": "",
+     "efforts": []
+    },
+    {
+     "id": "claude-opus-4-6",
+     "alias": "opus",
+     "name": "claude-opus-4-6",
+     "description": "",
+     "efforts": []
+    }
+   ]
+  },
+  {
+   "in": {},
+   "out": []
+  },
+  {
+   "in": {
+    "response": {
+     "response": {
+      "models": []
+     }
+    }
+   },
+   "out": []
+  }
+ ],
+ "commands": [
+  {
+   "in": {
+    "response": {
+     "response": {
+      "commands": [
+       {
+        "name": "compact",
+        "description": "a  b\nc"
+       },
+       {
+        "name": ""
+       },
+       {
+        "description": "sans nom"
+       },
+       3,
+       {
+        "name": "x"
+       }
+      ]
+     }
+    }
+   },
+   "out": [
+    {
+     "name": "compact",
+     "description": "a b c"
+    },
+    {
+     "name": "x",
+     "description": ""
+    }
+   ]
+  },
+  {
+   "in": {},
+   "out": []
+  }
+ ],
+ "contextUsage": [
+  {
+   "in": {
+    "maxTokens": 200000,
+    "totalTokens": 50000,
+    "model": "claude-sonnet-5-5",
+    "autoCompactThreshold": 160000,
+    "isAutoCompactEnabled": true,
+    "categories": [
+     {
+      "id": "messages",
+      "tokens": 30000,
+      "kind": "used"
+     },
+     {
+      "id": "free_space",
+      "tokens": 150000,
+      "kind": "free"
+     },
+     {
+      "id": "custom",
+      "name": "Perso",
+      "tokens": 5
+     }
+    ],
+    "messageBreakdown": {
+     "toolCallTokens": 1,
+     "toolResultTokens": 2,
+     "attachmentTokens": 3,
+     "assistantMessageTokens": 4,
+     "userMessageTokens": 5
+    }
+   },
+   "out": {
+    "total": 50000,
+    "max": 200000,
+    "model": "claude-sonnet-5-5",
+    "categories": [
+     {
+      "id": "messages",
+      "name": "Messages",
+      "tokens": 30000,
+      "kind": "used"
+     },
+     {
+      "id": "free_space",
+      "name": "Espace libre",
+      "tokens": 150000,
+      "kind": "free"
+     },
+     {
+      "id": "custom",
+      "name": "Perso",
+      "tokens": 5,
+      "kind": "used"
+     }
+    ],
+    "autoCompactAt": 160000,
+    "toolCalls": 1,
+    "toolResults": 2,
+    "attachments": 3,
+    "assistant": 4,
+    "user": 5,
+    "approximate": false,
+    "percent": 25
+   }
+  },
+  {
+   "in": {
+    "maxTokens": 0
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "maxTokens": 10,
+    "totalTokens": 1,
+    "isAutoCompactEnabled": false,
+    "autoCompactThreshold": 5
+   },
+   "out": {
+    "total": 1,
+    "max": 10,
+    "categories": [],
+    "toolCalls": 0,
+    "toolResults": 0,
+    "attachments": 0,
+    "assistant": 0,
+    "user": 0,
+    "approximate": false,
+    "percent": 10
+   }
+  },
+  {
+   "in": {
+    "maxTokens": 3,
+    "totalTokens": 1,
+    "autoCompactThreshold": 2
+   },
+   "out": {
+    "total": 1,
+    "max": 3,
+    "categories": [],
+    "autoCompactAt": 2,
+    "toolCalls": 0,
+    "toolResults": 0,
+    "attachments": 0,
+    "assistant": 0,
+    "user": 0,
+    "approximate": false,
+    "percent": 33
+   }
+  }
+ ],
+ "cleanSuggestion": [
+  {
+   "in": "  \n  Lance les tests  \nautre",
+   "out": "Lance les tests"
+  },
+  {
+   "in": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "out": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "in": "   ",
+   "out": null
+  },
+  {
+   "in": "",
+   "out": null
+  },
+  {
+   "in": null,
+   "out": null
+  },
+  {
+   "in": "une\nligne",
+   "out": "une"
+  }
+ ]
+}

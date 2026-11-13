@@ -1,0 +1,142 @@
+{
+ "_doc": "build(cli) -> [{name,category}] dans l'ordre ; group(query) -> [[catégorie,[noms]]]",
+ "cases": [
+  {
+   "cli": [
+    {
+     "name": "compact",
+     "description": "x"
+    },
+    {
+     "name": "acme:deploy",
+     "description": "d"
+    },
+    {
+     "name": "mon-skill",
+     "description": "s"
+    },
+    {
+     "name": "review",
+     "description": "doublon"
+    },
+    {
+     "name": "__hidden",
+     "description": ""
+    },
+    {
+     "name": "extra-usage",
+     "description": ""
+    },
+    {
+     "name": "model",
+     "description": "m"
+    }
+   ],
+   "queries": [
+    "",
+    "co",
+    "m",
+    "zzz"
+   ],
+   "build": [
+    {
+     "name": "explain",
+     "category": "Raccourcis du plugin"
+    },
+    {
+     "name": "fix",
+     "category": "Raccourcis du plugin"
+    },
+    {
+     "name": "tests",
+     "category": "Raccourcis du plugin"
+    },
+    {
+     "name": "doc",
+     "category": "Raccourcis du plugin"
+    },
+    {
+     "name": "review",
+     "category": "Raccourcis du plugin"
+    },
+    {
+     "name": "compact",
+     "category": "Session"
+    },
+    {
+     "name": "acme:deploy",
+     "category": "Plugins"
+    },
+    {
+     "name": "mon-skill",
+     "category": "Skills et extensions"
+    },
+    {
+     "name": "model",
+     "category": "Configuration"
+    }
+   ],
+   "group": [
+    [
+     [
+      "Raccourcis du plugin",
+      [
+       "doc",
+       "explain",
+       "fix",
+       "review",
+       "tests"
+      ]
+     ],
+     [
+      "Session",
+      [
+       "compact"
+      ]
+     ],
+     [
+      "Configuration",
+      [
+       "model"
+      ]
+     ],
+     [
+      "Skills et extensions",
+      [
+       "mon-skill"
+      ]
+     ],
+     [
+      "Plugins",
+      [
+       "acme:deploy"
+      ]
+     ]
+    ],
+    [
+     [
+      "Session",
+      [
+       "compact"
+      ]
+     ]
+    ],
+    [
+     [
+      "Configuration",
+      [
+       "model"
+      ]
+     ],
+     [
+      "Skills et extensions",
+      [
+       "mon-skill"
+      ]
+     ]
+    ],
+    []
+   ]
+  }
+ ]
+}

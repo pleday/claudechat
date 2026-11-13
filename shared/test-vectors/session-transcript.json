@@ -1,0 +1,252 @@
+{
+ "_doc": "Reconstitution d'un transcript depuis les lignes .jsonl de la CLI ; title = titre affiché dans la liste.",
+ "cases": [
+  {
+   "lines": [
+    {
+     "type": "user",
+     "message": {
+      "content": "lis a.txt"
+     }
+    },
+    {
+     "type": "assistant",
+     "message": {
+      "model": "claude-sonnet-5-5",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "hmm"
+       },
+       {
+        "type": "text",
+        "text": "ok"
+       },
+       {
+        "type": "tool_use",
+        "id": "t1",
+        "name": "Read",
+        "input": {
+         "file_path": "/a.txt"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "type": "user",
+     "message": {
+      "content": [
+       {
+        "type": "tool_result",
+        "tool_use_id": "t1",
+        "content": [
+         {
+          "type": "text",
+          "text": "contenu"
+         }
+        ],
+        "is_error": false
+       }
+      ]
+     }
+    },
+    {
+     "type": "assistant",
+     "message": {
+      "content": [
+       {
+        "type": "text",
+        "text": "  "
+       }
+      ]
+     }
+    }
+   ],
+   "title": "lis a.txt",
+   "entries": [
+    {
+     "kind": "user",
+     "text": "lis a.txt"
+    },
+    {
+     "kind": "thinking",
+     "text": "hmm",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "kind": "text",
+     "text": "ok",
+     "model": "claude-sonnet-5-5"
+    },
+    {
+     "kind": "tool",
+     "text": "",
+     "toolName": "Read",
+     "result": "contenu",
+     "isError": false,
+     "model": "claude-sonnet-5-5"
+    }
+   ]
+  },
+  {
+   "lines": [
+    {
+     "type": "user",
+     "message": {
+      "content": "<command-name>interne</command-name>"
+     }
+    },
+    {
+     "type": "user",
+     "isMeta": true,
+     "message": {
+      "content": "meta"
+     }
+    },
+    {
+     "type": "user",
+     "message": {
+      "content": [
+       {
+        "type": "text",
+        "text": "vrai"
+       },
+       {
+        "type": "text",
+        "text": "texte"
+       }
+      ]
+     }
+    },
+    {
+     "type": "assistant",
+     "message": {
+      "content": [
+       {
+        "type": "tool_use",
+        "id": "t9",
+        "name": "Bash",
+        "input": {
+         "command": "ls"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "type": "user",
+     "message": {
+      "content": [
+       {
+        "type": "tool_result",
+        "tool_use_id": "t9",
+        "content": "boum",
+        "is_error": true
+       }
+      ]
+     }
+    }
+   ],
+   "title": "vrai",
+   "entries": [
+    {
+     "kind": "user",
+     "text": "vrai\ntexte"
+    },
+    {
+     "kind": "tool",
+     "text": "",
+     "toolName": "Bash",
+     "result": "boum",
+     "isError": true
+    }
+   ]
+  },
+  {
+   "lines": [
+    {
+     "type": "user",
+     "message": {
+      "content": "x"
+     }
+    },
+    {
+     "type": "ai-title",
+     "aiTitle": "Titre IA"
+    }
+   ],
+   "title": "Titre IA",
+   "entries": [
+    {
+     "kind": "user",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "lines": [
+    {
+     "type": "user",
+     "message": {
+      "content": "x"
+     }
+    },
+    {
+     "type": "ai-title",
+     "aiTitle": "IA"
+    },
+    {
+     "type": "custom-title",
+     "customTitle": "Mon titre"
+    }
+   ],
+   "title": "Mon titre",
+   "entries": [
+    {
+     "kind": "user",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "lines": [
+    {
+     "type": "user",
+     "message": {
+      "content": "premier message\nsuite"
+     }
+    }
+   ],
+   "title": "premier message",
+   "entries": [
+    {
+     "kind": "user",
+     "text": "premier message\nsuite"
+    }
+   ]
+  },
+  {
+   "lines": [
+    {
+     "type": "assistant",
+     "message": {
+      "content": [
+       {
+        "type": "text",
+        "text": "seul"
+       }
+      ]
+     }
+    }
+   ],
+   "title": "Conversation",
+   "entries": [
+    {
+     "kind": "text",
+     "text": "seul"
+    }
+   ]
+  }
+ ]
+}

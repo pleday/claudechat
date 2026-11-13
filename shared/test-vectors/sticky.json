@@ -1,0 +1,179 @@
+{
+ "_doc": "Message épinglé : isResume(in) -> bool ; pick(in: messages) -> {prompt, resumedWith} ou null",
+ "isResume": [
+  {
+   "in": "continue",
+   "out": true
+  },
+  {
+   "in": "Continue !",
+   "out": true
+  },
+  {
+   "in": "reprends",
+   "out": true
+  },
+  {
+   "in": "recommence",
+   "out": true
+  },
+  {
+   "in": "Recommence.",
+   "out": true
+  },
+  {
+   "in": "ok continue",
+   "out": true
+  },
+  {
+   "in": "oui, continue stp",
+   "out": true
+  },
+  {
+   "in": "reprends là où tu t'étais arrêté",
+   "out": true
+  },
+  {
+   "in": "reprends ta tâche",
+   "out": true
+  },
+  {
+   "in": "vas-y",
+   "out": true
+  },
+  {
+   "in": "go on",
+   "out": true
+  },
+  {
+   "in": "keep going",
+   "out": true
+  },
+  {
+   "in": "try again",
+   "out": true
+  },
+  {
+   "in": "relance",
+   "out": true
+  },
+  {
+   "in": "Le quota est réinitialisé : reprends ta tâche là où tu t'étais arrêté.",
+   "out": true
+  },
+  {
+   "in": "continue s'il te plaît",
+   "out": true
+  },
+  {
+   "in": "réessaie",
+   "out": true
+  },
+  {
+   "in": "continue avec la partie tests",
+   "out": false
+  },
+  {
+   "in": "recommence en kotlin",
+   "out": false
+  },
+  {
+   "in": "reprends mais sans utiliser Gradle",
+   "out": false
+  },
+  {
+   "in": "ajoute un bouton",
+   "out": false
+  },
+  {
+   "in": "go",
+   "out": false
+  },
+  {
+   "in": "ok",
+   "out": false
+  },
+  {
+   "in": "oui",
+   "out": false
+  },
+  {
+   "in": "merci",
+   "out": false
+  },
+  {
+   "in": "",
+   "out": false
+  },
+  {
+   "in": "   ",
+   "out": false
+  },
+  {
+   "in": "continue de lire le fichier ChatPanel.kt et corrige le bug",
+   "out": false
+  }
+ ],
+ "pick": [
+  {
+   "in": [],
+   "out": null
+  },
+  {
+   "in": [
+    "fais X"
+   ],
+   "out": {
+    "prompt": "fais X"
+   }
+  },
+  {
+   "in": [
+    "fais X",
+    "continue"
+   ],
+   "out": {
+    "prompt": "fais X",
+    "resumedWith": "continue"
+   }
+  },
+  {
+   "in": [
+    "fais X",
+    "puis Y"
+   ],
+   "out": {
+    "prompt": "puis Y"
+   }
+  },
+  {
+   "in": [
+    "continue"
+   ],
+   "out": {
+    "prompt": "continue"
+   }
+  },
+  {
+   "in": [
+    "a",
+    "b",
+    "continue",
+    "reprends"
+   ],
+   "out": {
+    "prompt": "b",
+    "resumedWith": "reprends"
+   }
+  },
+  {
+   "in": [
+    "continue",
+    "continue"
+   ],
+   "out": {
+    "prompt": "continue"
+   }
+  }
+ ]
+}

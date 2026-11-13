@@ -1,0 +1,895 @@
+{
+ "_doc": "Fonctions pures de saisie, outils, quotas et durées. Chaque section : liste de {in, out}.",
+ "fuzzySearch": [
+  {
+   "in": {
+    "query": "chat",
+    "paths": [
+     "src/ChatPanel.kt",
+     "docs/archive/c/h/a/t.md",
+     "README.md"
+    ]
+   },
+   "out": [
+    "src/ChatPanel.kt",
+    "docs/archive/c/h/a/t.md"
+   ]
+  },
+  {
+   "in": {
+    "query": "",
+    "paths": [
+     "a",
+     "b"
+    ]
+   },
+   "out": [
+    "a",
+    "b"
+   ]
+  },
+  {
+   "in": {
+    "query": "zz",
+    "paths": [
+     "abc"
+    ]
+   },
+   "out": []
+  },
+  {
+   "in": {
+    "query": "cp",
+    "paths": [
+     "src/ChatPanel.kt",
+     "src/CliClient.kt",
+     "copy.txt"
+    ]
+   },
+   "out": [
+    "copy.txt",
+    "src/ChatPanel.kt"
+   ]
+  },
+  {
+   "in": {
+    "query": "readme",
+    "paths": [
+     "README.md",
+     "docs/readme-fr.md",
+     "src/Readme.kt"
+    ]
+   },
+   "out": [
+    "README.md",
+    "docs/readme-fr.md",
+    "src/Readme.kt"
+   ]
+  }
+ ],
+ "mentionsFind": [
+  {
+   "in": "voir @src/a.ts et @src/a.ts puis @b.md, mail a@b.c",
+   "out": [
+    "src/a.ts",
+    "b.md"
+   ]
+  },
+  {
+   "in": "@x",
+   "out": [
+    "x"
+   ]
+  },
+  {
+   "in": "pas de mention",
+   "out": []
+  },
+  {
+   "in": "@a/b-c_d.txt, @e",
+   "out": [
+    "a/b-c_d.txt",
+    "e"
+   ]
+  }
+ ],
+ "mentionsActive": [
+  {
+   "in": {
+    "text": "regarde @sr",
+    "caret": 11
+   },
+   "out": {
+    "start": 8,
+    "query": "sr"
+   }
+  },
+  {
+   "in": {
+    "text": "regarde @sr ok",
+    "caret": 14
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "text": "@",
+    "caret": 1
+   },
+   "out": {
+    "start": 0,
+    "query": ""
+   }
+  },
+  {
+   "in": {
+    "text": "mail a@b",
+    "caret": 8
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "text": "voir @src/Cha",
+    "caret": 13
+   },
+   "out": {
+    "start": 5,
+    "query": "src/Cha"
+   }
+  }
+ ],
+ "slashActive": [
+  {
+   "in": {
+    "text": "/co",
+    "caret": 3
+   },
+   "out": "co"
+  },
+  {
+   "in": {
+    "text": "texte /co",
+    "caret": 9
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "text": "/",
+    "caret": 1
+   },
+   "out": ""
+  },
+  {
+   "in": {
+    "text": "/a:b-c.d",
+    "caret": 8
+   },
+   "out": "a:b-c.d"
+  },
+  {
+   "in": {
+    "text": "/co mpact",
+    "caret": 9
+   },
+   "out": null
+  }
+ ],
+ "slashFilter": [
+  {
+   "in": {
+    "query": "c",
+    "commands": [
+     "compact",
+     "clear",
+     "Context",
+     "model"
+    ]
+   },
+   "out": [
+    "Context",
+    "clear",
+    "compact"
+   ]
+  },
+  {
+   "in": {
+    "query": "co",
+    "commands": [
+     "compact",
+     "clear",
+     "Context",
+     "model"
+    ]
+   },
+   "out": [
+    "Context",
+    "compact"
+   ]
+  },
+  {
+   "in": {
+    "query": "",
+    "commands": [
+     "compact",
+     "clear",
+     "Context",
+     "model"
+    ]
+   },
+   "out": [
+    "Context",
+    "clear",
+    "compact",
+    "model"
+   ]
+  },
+  {
+   "in": {
+    "query": "x",
+    "commands": [
+     "compact",
+     "clear",
+     "Context",
+     "model"
+    ]
+   },
+   "out": []
+  },
+  {
+   "in": {
+    "query": "CO",
+    "commands": [
+     "compact",
+     "clear",
+     "Context",
+     "model"
+    ]
+   },
+   "out": [
+    "Context",
+    "compact"
+   ]
+  }
+ ],
+ "toolSummary": [
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "ls -la"
+    }
+   },
+   "out": "ls -la"
+  },
+  {
+   "in": {
+    "name": "Read",
+    "input": {
+     "file_path": "/a/b"
+    }
+   },
+   "out": "/a/b"
+  },
+  {
+   "in": {
+    "name": "Grep",
+    "input": {
+     "pattern": "x",
+     "path": "src"
+    }
+   },
+   "out": "x in src"
+  },
+  {
+   "in": {
+    "name": "Glob",
+    "input": {
+     "pattern": "*.kt"
+    }
+   },
+   "out": "*.kt"
+  },
+  {
+   "in": {
+    "name": "WebFetch",
+    "input": {
+     "url": "http://x"
+    }
+   },
+   "out": "http://x"
+  },
+  {
+   "in": {
+    "name": "WebSearch",
+    "input": {
+     "query": "q"
+    }
+   },
+   "out": "q"
+  },
+  {
+   "in": {
+    "name": "Task",
+    "input": {
+     "description": "d"
+    }
+   },
+   "out": "d"
+  },
+  {
+   "in": {
+    "name": "NotebookEdit",
+    "input": {
+     "notebook_path": "/n.ipynb"
+    }
+   },
+   "out": "/n.ipynb"
+  },
+  {
+   "in": {
+    "name": "Inconnu",
+    "input": {
+     "a": 1
+    }
+   },
+   "out": "{\"a\":1}"
+  }
+ ],
+ "describeTool": [
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "ls"
+    }
+   },
+   "out": "ls"
+  },
+  {
+   "in": {
+    "name": "Edit",
+    "input": {
+     "file_path": "/a",
+     "old_string": "x",
+     "new_string": "y"
+    }
+   },
+   "out": "Fichier : /a\n- x\n+ y"
+  },
+  {
+   "in": {
+    "name": "MultiEdit",
+    "input": {
+     "file_path": "/a",
+     "edits": [
+      1,
+      2
+     ]
+    }
+   },
+   "out": "Fichier : /a\n2 modification(s)"
+  },
+  {
+   "in": {
+    "name": "Write",
+    "input": {
+     "file_path": "/a",
+     "content": "abc"
+    }
+   },
+   "out": "Fichier : /a\nabc"
+  },
+  {
+   "in": {
+    "name": "Read",
+    "input": {
+     "file_path": "/a"
+    }
+   },
+   "out": "/a"
+  }
+ ],
+ "formatDuration": [
+  {
+   "in": 0,
+   "out": "moins d'une seconde"
+  },
+  {
+   "in": 200,
+   "out": "moins d'une seconde"
+  },
+  {
+   "in": 499,
+   "out": "moins d'une seconde"
+  },
+  {
+   "in": 500,
+   "out": "1 s"
+  },
+  {
+   "in": 1000,
+   "out": "1 s"
+  },
+  {
+   "in": 42000,
+   "out": "42 s"
+  },
+  {
+   "in": 59500,
+   "out": "1 min"
+  },
+  {
+   "in": 83000,
+   "out": "1 min 23 s"
+  },
+  {
+   "in": 120000,
+   "out": "2 min"
+  },
+  {
+   "in": 3900000,
+   "out": "1 h 05 min"
+  },
+  {
+   "in": 7200000,
+   "out": "2 h"
+  },
+  {
+   "in": 3601000,
+   "out": "1 h"
+  }
+ ],
+ "quotaRemaining": [
+  {
+   "in": {
+    "resetsAt": 10,
+    "now": 10
+   },
+   "out": "0 min"
+  },
+  {
+   "in": {
+    "resetsAt": 69,
+    "now": 10
+   },
+   "out": "0 min"
+  },
+  {
+   "in": {
+    "resetsAt": 610,
+    "now": 10
+   },
+   "out": "10 min"
+  },
+  {
+   "in": {
+    "resetsAt": 11110,
+    "now": 10
+   },
+   "out": "3 h 05"
+  },
+  {
+   "in": {
+    "resetsAt": 7210,
+    "now": 10
+   },
+   "out": "2 h 00"
+  },
+  {
+   "in": {
+    "resetsAt": 90010,
+    "now": 10
+   },
+   "out": "1 j 1 h"
+  },
+  {
+   "in": {
+    "resetsAt": 273610,
+    "now": 10
+   },
+   "out": "3 j 4 h"
+  }
+ ],
+ "quotaPercent": [
+  {
+   "in": {
+    "window": null,
+    "now": 10
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "window": {
+     "utilization": 0.42,
+     "resetsAt": 0
+    },
+    "now": 10
+   },
+   "out": 42
+  },
+  {
+   "in": {
+    "window": {
+     "utilization": 0.9,
+     "resetsAt": 5
+    },
+    "now": 10
+   },
+   "out": 0
+  },
+  {
+   "in": {
+    "window": {
+     "utilization": 1.5,
+     "resetsAt": 100
+    },
+    "now": 10
+   },
+   "out": 100
+  },
+  {
+   "in": {
+    "window": {
+     "utilization": 0.999,
+     "resetsAt": 100
+    },
+    "now": 10
+   },
+   "out": 99
+  }
+ ],
+ "quotaGuard": [
+  {
+   "in": {
+    "limits": null,
+    "message": "erreur banale",
+    "now": 100,
+    "delay": 60
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "limits": {
+     "status": "rejected",
+     "resetsAt": 1000
+    },
+    "message": null,
+    "now": 100,
+    "delay": 60
+   },
+   "out": 1060
+  },
+  {
+   "in": {
+    "limits": null,
+    "message": "Usage limit reached",
+    "now": 100,
+    "delay": 60
+   },
+   "out": 1900
+  },
+  {
+   "in": {
+    "limits": {
+     "fiveHour": {
+      "utilization": 1,
+      "resetsAt": 500
+     }
+    },
+    "message": "rate limit",
+    "now": 100,
+    "delay": 0
+   },
+   "out": 500
+  },
+  {
+   "in": {
+    "limits": {
+     "status": "rejected",
+     "limitType": "seven_day",
+     "sevenDay": {
+      "utilization": 1,
+      "resetsAt": 9000
+     }
+    },
+    "message": null,
+    "now": 100,
+    "delay": 120
+   },
+   "out": 9120
+  },
+  {
+   "in": {
+    "limits": {
+     "status": "rejected",
+     "limitType": "five_hour",
+     "resetsAt": 50,
+     "fiveHour": {
+      "utilization": 1,
+      "resetsAt": 40
+     }
+    },
+    "message": null,
+    "now": 100,
+    "delay": 10
+   },
+   "out": 1900
+  },
+  {
+   "in": {
+    "limits": {
+     "fiveHour": {
+      "utilization": 0.5,
+      "resetsAt": 700
+     }
+    },
+    "message": "quota",
+    "now": 100,
+    "delay": 0
+   },
+   "out": 700
+  }
+ ],
+ "queuePreview": [
+  {
+   "in": {
+    "queue": [],
+    "max": 80
+   },
+   "out": ""
+  },
+  {
+   "in": {
+    "queue": [
+     "a"
+    ],
+    "max": 80
+   },
+   "out": "a"
+  },
+  {
+   "in": {
+    "queue": [
+     "a",
+     "b\nsuite"
+    ],
+    "max": 80
+   },
+   "out": "b  (+1 autre)"
+  },
+  {
+   "in": {
+    "queue": [
+     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ],
+    "max": 20
+   },
+   "out": "xxxxxxxxxxxxxxxxxxx…"
+  },
+  {
+   "in": {
+    "queue": [
+     "a",
+     "b",
+     "c"
+    ],
+    "max": 80
+   },
+   "out": "c  (+2 autres)"
+  },
+  {
+   "in": {
+    "queue": [
+     "\n\nl3"
+    ],
+    "max": 80
+   },
+   "out": "l3"
+  }
+ ],
+ "busyWarning": [
+  {
+   "in": {
+    "streaming": false,
+    "queued": 3,
+    "consequence": "Stop."
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "streaming": true,
+    "queued": 0,
+    "consequence": "Stop."
+   },
+   "out": "Claude est en train de répondre. Stop."
+  },
+  {
+   "in": {
+    "streaming": true,
+    "queued": 1,
+    "consequence": "Stop."
+   },
+   "out": "Claude est en train de répondre. Stop.\n\n1 message en attente sera perdu."
+  },
+  {
+   "in": {
+    "streaming": true,
+    "queued": 2,
+    "consequence": "Stop."
+   },
+   "out": "Claude est en train de répondre. Stop.\n\n2 messages en attente seront perdus."
+  }
+ ],
+ "chunkText": [
+  {
+   "in": {
+    "text": "court",
+    "max": 10
+   },
+   "out": [
+    "court"
+   ]
+  },
+  {
+   "in": {
+    "text": "mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot mot ",
+    "max": 50
+   },
+   "out": [
+    "mot mot mot mot mot mot mot mot mot mot mot mot",
+    "mot mot mot mot mot mot mot mot mot mot mot mot",
+    "mot mot mot mot mot mot mot mot mot mot mot mot",
+    "mot mot mot mot"
+   ]
+  },
+  {
+   "in": {
+    "text": "a\nb\nc\nd\ne\nf",
+    "max": 5
+   },
+   "out": [
+    "a\nb\nc",
+    "d\ne\nf"
+   ]
+  },
+  {
+   "in": {
+    "text": "xxxxxxxxxxxxxxxxxxxxxxxxx",
+    "max": 10
+   },
+   "out": [
+    "xxxxxxxxxx",
+    "xxxxxxxxxx",
+    "xxxxx"
+   ]
+  },
+  {
+   "in": {
+    "text": "   ",
+    "max": 5
+   },
+   "out": []
+  }
+ ],
+ "fmtTokens": [
+  {
+   "in": 0,
+   "out": "0"
+  },
+  {
+   "in": 842,
+   "out": "842"
+  },
+  {
+   "in": 999,
+   "out": "999"
+  },
+  {
+   "in": 1000,
+   "out": "1,0k"
+  },
+  {
+   "in": 1500,
+   "out": "1,5k"
+  },
+  {
+   "in": 134600,
+   "out": "134,6k"
+  },
+  {
+   "in": 999999,
+   "out": "1000,0k"
+  },
+  {
+   "in": 1000000,
+   "out": "1,0M"
+  },
+  {
+   "in": 2500000,
+   "out": "2,5M"
+  }
+ ],
+ "modelLabel": [
+  {
+   "in": "claude-opus-5-5",
+   "out": "Opus 5.5"
+  },
+  {
+   "in": "claude-foo-4-6-20250101",
+   "out": "Foo 4.6"
+  },
+  {
+   "in": "claude-foo-4",
+   "out": "Foo 4"
+  },
+  {
+   "in": "inconnu",
+   "out": "inconnu"
+  },
+  {
+   "in": "claude-haiku-5-5",
+   "out": "Haiku 5.5"
+  },
+  {
+   "in": "sonnet",
+   "out": "sonnet"
+  }
+ ],
+ "modelResolve": [
+  {
+   "in": "Sonnet",
+   "out": "claude-sonnet-5-5"
+  },
+  {
+   "in": "opus",
+   "out": "claude-opus-5-5"
+  },
+  {
+   "in": "haiku ",
+   "out": "claude-haiku-5-5"
+  },
+  {
+   "in": "claude-x",
+   "out": "claude-x"
+  },
+  {
+   "in": "inconnu",
+   "out": "inconnu"
+  }
+ ],
+ "lineCount": [
+  {
+   "in": "",
+   "out": 0
+  },
+  {
+   "in": "a",
+   "out": 1
+  },
+  {
+   "in": "a\n",
+   "out": 1
+  },
+  {
+   "in": "a\nb\n",
+   "out": 2
+  },
+  {
+   "in": "a\nb",
+   "out": 2
+  },
+  {
+   "in": "\n",
+   "out": 1
+  },
+  {
+   "in": "\n\n",
+   "out": 2
+  }
+ ]
+}
