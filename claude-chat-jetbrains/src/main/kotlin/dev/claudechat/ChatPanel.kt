@@ -1925,7 +1925,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         stickyBar.isVisible = c != null
         if (c == null) return
         stickyLabel.icon = if (stickyOpen) AllIcons.General.ArrowDown else AllIcons.General.ArrowRight
-        stickyLabel.text = (if (c.resumedWith != null) "↻ " else "") + c.prompt.replace(Regex("\\s+"), " ").trim()
+        // déplié, le message entier est dans la zone de texte : le libellé ne le répète pas (sinon la 1re ligne apparaîtrait deux fois)
+        stickyLabel.text = if (stickyOpen) (if (c.resumedWith != null) "↻ Votre message (reprise demandée)" else "Votre message")
+        else (if (c.resumedWith != null) "↻ " else "") + c.prompt.replace(Regex("\\s+"), " ").trim()
         stickyScroll.isVisible = stickyOpen
         if (stickyOpen) {
             val text = c.prompt + (c.resumedWith?.let { "\n\n↻ Dernier message : ${it.trim()}" } ?: "")
