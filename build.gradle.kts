@@ -15,6 +15,7 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.3")
+        pluginVerifier()
     }
     implementation("org.commonmark:commonmark:0.22.0")
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.22.0")
@@ -35,6 +36,10 @@ intellijPlatform {
     // Évite de lancer un second IDE pendant la construction (impossible si `make run` est ouvert) ;
     // seul l'index de la recherche des réglages en dépend.
     buildSearchableOptions = false
+    // Compatibilité sur les IDE récents (untilBuild est ouvert : l'API interne utilisée peut casser) : `./gradlew verifyPlugin`
+    pluginVerification {
+        ides { recommended() }
+    }
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "243"

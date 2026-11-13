@@ -15,6 +15,7 @@ cartes d'outils, approbation des actions, diff IntelliJ modifiable, sessions de 
 | `make plugin` | tests puis zip installable dans `build/distributions/` |
 | `make run` | IDE de test avec le plugin |
 | `make verify` | contrôle de la configuration du plugin |
+| `make compat` | compatibilité binaire avec les IDE récents (`verifyPlugin`, télécharge les IDE) |
 
 Sans `make` : `./gradlew test`, `./gradlew buildPlugin`, `./gradlew runIde`.
 
