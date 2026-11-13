@@ -20,6 +20,33 @@ class TextToolsTest {
     @Test fun mentionsFindsPathsOnce() =
         assertEquals(listOf("src/A.kt", "README.md"), Mentions.find("regarde @src/A.kt et @README.md puis @src/A.kt"))
 
+    @Test fun slashQueryOnlyAtStart() {
+        assertEquals("", SlashToken.activeQuery("/", 1))
+        assertEquals("ex", SlashToken.activeQuery("/ex", 3))
+        assertNull(SlashToken.activeQuery("voir /ex", 8))
+        assertNull(SlashToken.activeQuery("/explain code", 13))
+    }
+    @Test fun slashQueryAcceptsDashAndColon() = assertEquals("deep-re", SlashToken.activeQuery("/deep-re", 8))
+    @Test fun parsesCliCommands() {
+        val j = com.google.gson.JsonParser.parseString("""{"response":{"response":{"commands":[{"name":"compact","description":"Résume\n  le contexte"},{"description":"sans nom"}]}}}""").asJsonObject
+        assertEquals(listOf(CliCommand("compact", "Résume le contexte")), CliTurn.parseCommands(j))
+        assertTrue(CliTurn.parseCommands(com.google.gson.JsonObject()).isEmpty())
+    }
+    @Test fun slashCatalogGroupsAndTranslates() {
+        val cli = listOf(CliCommand("compact", "Free up context"), CliCommand("review", "doublon"), CliCommand("acme:deploy", "Deploy it"),
+            CliCommand("mon-skill", "Do things"), CliCommand("__remote-workflow", "interne"))
+        val all = SlashCatalog.build(cli)
+        assertEquals("Résumer la conversation pour libérer du contexte", all.first { it.name == "compact" }.description)
+        assertEquals(SlashCatalog.PLUGIN, all.first { it.name == "review" }.category)
+        assertEquals(SlashCatalog.PLUGINS, all.first { it.name == "acme:deploy" }.category)
+        assertEquals("Do things", all.first { it.name == "mon-skill" }.description)
+        assertTrue(all.none { it.name.startsWith("__") })
+        val g = SlashCatalog.group("", all)
+        assertEquals(listOf(SlashCatalog.PLUGIN, SlashCatalog.SESSION, SlashCatalog.SKILLS, SlashCatalog.PLUGINS), g.map { it.first })
+        assertEquals(listOf("compact"), SlashCatalog.group("co", all).single { it.first == SlashCatalog.SESSION }.second.map { it.name })
+    }
+    @Test fun slashFilterByPrefix() =
+        assertEquals(listOf("explain"), SlashToken.filter("EX", listOf("fix", "explain", "doc")))
     @Test fun mentionsIgnoresEmails() = assertTrue(Mentions.find("écris à jean@exemple.com").isEmpty())
 
     @Test fun activeTokenBeforeCaret() {

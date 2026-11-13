@@ -150,8 +150,19 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         emptyText.setText("@ pour les fichiers, / pour les commandes, Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne")
         inputMap.put(KeyStroke.getKeyStroke("ENTER"), "claude-send")
         actionMap.put("claude-send", object : AbstractAction() {
-            override fun actionPerformed(e: ActionEvent?) = send()
+            override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept")) send() }
         })
+        inputMap.put(KeyStroke.getKeyStroke("TAB"), "claude-complete")
+        actionMap.put("claude-complete", object : AbstractAction() {
+            override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept")) transferFocus() }
+        })
+        for ((key, dir, base) in listOf(Triple("UP", "up", "caret-up"), Triple("DOWN", "down", "caret-down"))) {
+            val original = actionMap.get(base)
+            inputMap.put(KeyStroke.getKeyStroke(key), "claude-$dir")
+            actionMap.put("claude-$dir", object : AbstractAction() {
+                override fun actionPerformed(e: ActionEvent?) { if (!completionKey(dir)) original?.actionPerformed(e) }
+            })
+        }
         inputMap.put(KeyStroke.getKeyStroke("shift ENTER"), "insert-break")
         inputMap.put(KeyStroke.getKeyStroke("control ENTER"), "claude-refine")
         actionMap.put("claude-refine", object : AbstractAction() {
@@ -159,11 +170,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         })
         inputMap.put(KeyStroke.getKeyStroke("ESCAPE"), "claude-stop")
         actionMap.put("claude-stop", object : AbstractAction() {
-            override fun actionPerformed(e: ActionEvent?) { if (streaming) stop() }
+            override fun actionPerformed(e: ActionEvent?) { if (!completionKey("close") && streaming) stop() }
         })
         document.addDocumentListener(object : javax.swing.event.DocumentListener {
             override fun insertUpdate(e: javax.swing.event.DocumentEvent?) { mentionChanged(); syncSend() }
-            override fun removeUpdate(e: javax.swing.event.DocumentEvent?) { syncSend() }
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent?) { mentionChanged(); syncSend() }
             override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {}
         })
     }
@@ -425,7 +436,14 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         if (remoteOn) RemoteBridge.register(phoneSink)
         if (System.currentTimeMillis() - settings.state.rlAt > 30 * 60_000L) probeQuota()
         ApplicationManager.getApplication().executeOnPooledThread { RemoteBridge.ensureStarted() }
+        loadProjectFiles()
+        // commandes slash de la CLI, chargées dès l'ouverture pour être proposées dès la première saisie
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val list = CliTurn.listCommands(settings.cliPath(), cwd)
+            if (list.isNotEmpty()) cliCommands = list
+        }
     }
+    @Volatile private var cliCommands: List<CliCommand> = emptyList()
 
     fun shutdown() { resumeAt = 0; RemoteBridge.unregister(phoneSink); abandonTurn() }
 
@@ -1157,38 +1175,161 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var projectFiles: List<String> = emptyList()
     private var mentionPopup: com.intellij.openapi.ui.popup.JBPopup? = null
 
+    private var filesLoadedAt = 0L
+    @Volatile private var filesLoading = false
+
     private fun loadProjectFiles() {
+        if (filesLoading) return
+        filesLoading = true
         com.intellij.openapi.application.ReadAction.nonBlocking<List<String>> {
             val out = ArrayList<String>()
             val base = project.basePath ?: return@nonBlocking out
             // sous-modules inclus : le contenu du projet couvre tous les modules et dossiers de contenu
-            com.intellij.openapi.roots.ProjectFileIndex.getInstance(project).iterateContent { vf ->
+            // ignorés : dossiers cachés (.idea, .git…), fichiers ignorés par l'IDE ou le VCS (build, node_modules…)
+            val types = com.intellij.openapi.fileTypes.FileTypeManager.getInstance()
+            val vcs = com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
+            val filter = com.intellij.openapi.vfs.VirtualFileFilter { vf ->
+                !(vf.name.startsWith(".") && vf.path != base) && !types.isFileIgnored(vf) && !vcs.isIgnoredFile(vf)
+            }
+            com.intellij.openapi.roots.ProjectFileIndex.getInstance(project).iterateContent({ vf ->
                 if (!vf.isDirectory && out.size < 50_000) out.add(vf.path.removePrefix(base).trimStart('/'))
                 true
-            }
+            }, filter)
             out
-        }.finishOnUiThread(ModalityState.any()) { projectFiles = it }.submit(com.intellij.util.concurrency.AppExecutorUtil.getAppExecutorService())
+        }.finishOnUiThread(ModalityState.any()) {
+            projectFiles = it; filesLoadedAt = System.currentTimeMillis(); filesLoading = false
+            mentionChanged() // une saisie « @ » faite pendant le chargement obtient enfin ses résultats
+        }.submit(com.intellij.util.concurrency.AppExecutorUtil.getAppExecutorService())
+    }
+
+    /** Fichiers ouverts puis récemment ouverts, en chemins relatifs au projet et présents dans la liste du projet. */
+    private fun recentFiles(): List<String> {
+        val base = project.basePath ?: return emptyList()
+        val known = projectFiles.toHashSet()
+        val fem = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+        val history = com.intellij.openapi.fileEditor.impl.EditorHistoryManager.getInstance(project).fileList.reversed()
+        return (fem.selectedFiles.toList() + fem.openFiles.toList() + history)
+            .map { it.path.removePrefix(base).trimStart('/') }
+            .filter { it in known }.distinct().take(15)
     }
 
     private fun mentionChanged() {
         SwingUtilities.invokeLater {
+            val slash = SlashToken.activeQuery(input.text, input.caretPosition)
+            if (slash != null) { showSlashPopup(slash); return@invokeLater }
             val tok = Mentions.activeToken(input.text, input.caretPosition)
             if (tok == null) { mentionPopup?.cancel(); mentionPopup = null; return@invokeLater }
-            if (projectFiles.isEmpty()) loadProjectFiles()
-            val hits = Fuzzy.search(tok.second, projectFiles, 15)
+            // liste préchargée à l'ouverture ; rafraîchie en tâche de fond si elle date (fichiers créés depuis)
+            if (projectFiles.isEmpty() || System.currentTimeMillis() - filesLoadedAt > 60_000) loadProjectFiles()
+            // sans requête : fichiers ouverts puis récents (plus utile qu'un ordre alphabétique arbitraire)
+            val hits = if (tok.second.isEmpty()) recentFiles().ifEmpty { Fuzzy.search("", projectFiles, 15) }
+                else Fuzzy.search(tok.second, projectFiles, 15)
             mentionPopup?.cancel()
             if (hits.isEmpty()) return@invokeLater
             val (start, _) = tok
-            mentionPopup = JBPopupFactory.getInstance().createPopupChooserBuilder(hits)
-                .setRequestFocus(false)
-                .setItemChosenCallback { path ->
-                    val t = input.text
-                    val end = input.caretPosition.coerceAtMost(t.length)
-                    input.text = t.substring(0, start) + "@" + path + " " + t.substring(end)
-                    input.caretPosition = (start + path.length + 2).coerceAtMost(input.document.length)
+            showCompletion(hits.map { CompletionRow(it) }) { path ->
+                val t = input.text
+                val end = input.caretPosition.coerceAtMost(t.length)
+                input.text = t.substring(0, start) + "@" + path + " " + t.substring(end)
+                input.caretPosition = (start + path.length + 2).coerceAtMost(input.document.length)
+            }
+        }
+    }
+
+    /** Ligne du popup de complétion : en-tête de groupe (non sélectionnable) ou choix. */
+    private class CompletionRow(val text: String, val header: Boolean = false, val value: String = text)
+
+    private var completionList: com.intellij.ui.components.JBList<CompletionRow>? = null
+    private var completionChoose: ((String) -> Unit)? = null
+
+    /** Popup flottant au niveau du curseur ; le focus reste dans le champ, ↑/↓/Entrée/Tab/Échap sont relayés (voir [completionKey]). */
+    private fun showCompletion(rows: List<CompletionRow>, onChoose: (String) -> Unit) {
+        if (rows.none { !it.header }) return
+        val list = com.intellij.ui.components.JBList(rows).apply {
+            selectionMode = javax.swing.ListSelectionModel.SINGLE_SELECTION
+            selectedIndex = rows.indexOfFirst { !it.header }
+            visibleRowCount = rows.size.coerceAtMost(10)
+            cellRenderer = object : javax.swing.DefaultListCellRenderer() {
+                override fun getListCellRendererComponent(l: javax.swing.JList<*>?, v: Any?, i: Int, sel: Boolean, foc: Boolean): java.awt.Component {
+                    val row = v as CompletionRow
+                    val c = super.getListCellRendererComponent(l, row.text, i, sel && !row.header, false) as javax.swing.JLabel
+                    if (row.header) {
+                        c.font = c.font.deriveFont(java.awt.Font.BOLD, c.font.size2D - 1f)
+                        c.foreground = UIUtil.getContextHelpForeground()
+                        c.border = JBUI.Borders.empty(4, 6, 1, 6)
+                    } else c.border = JBUI.Borders.empty(1, 14, 1, 6)
+                    return c
                 }
-                .createPopup()
-                .also { it.showUnderneathOf(input) }
+            }
+            addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                    val i = locationToIndex(e.point)
+                    if (i >= 0 && !rows[i].header) { selectedIndex = i; completionKey("accept") }
+                }
+            })
+        }
+        completionList = list
+        completionChoose = onChoose
+        val pane = JBScrollPane(list).apply { border = JBUI.Borders.empty() }
+        val popup = JBPopupFactory.getInstance().createComponentPopupBuilder(pane, null)
+            .setRequestFocus(false).setFocusable(false).setResizable(false).setMovable(false)
+            .setCancelOnClickOutside(true)
+            .createPopup()
+        mentionPopup = popup
+        val r = runCatching { input.modelToView2D(input.caretPosition) }.getOrNull()
+        val x = r?.x?.toInt() ?: 0
+        val top = r?.y?.toInt() ?: 0
+        val h = r?.height?.toInt() ?: input.height
+        val size = pane.preferredSize
+        val belowScreenY = input.locationOnScreen.y + top + h + size.height
+        val screenBottom = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds.let { it.y + it.height }
+        val y = if (belowScreenY > screenBottom) top - size.height - 2 else top + h + 2
+        popup.show(com.intellij.ui.awt.RelativePoint(input, java.awt.Point(x, y)))
+    }
+
+    /** Relaie une touche au popup de complétion ; renvoie false s'il n'est pas affiché. */
+    private fun completionKey(action: String): Boolean {
+        val list = completionList
+        val popup = mentionPopup
+        if (list == null || popup == null || popup.isDisposed || !popup.isVisible) return false
+        val n = list.model.size
+        fun step(d: Int) {
+            var i = list.selectedIndex
+            for (k in 0 until n) {
+                i = (i + d + n) % n
+                if (!list.model.getElementAt(i).header) { list.selectedIndex = i; break }
+            }
+            // en remontant sur le premier choix, l'en-tête de son groupe reste visible
+            list.ensureIndexIsVisible(if (i > 0 && list.model.getElementAt(i - 1).header) i - 1 else i)
+        }
+        when (action) {
+            "up" -> step(-1)
+            "down" -> step(1)
+            "accept" -> {
+                val item = list.selectedValue?.takeIf { !it.header }
+                val choose = completionChoose
+                popup.cancel(); mentionPopup = null
+                if (item != null) choose?.invoke(item.value)
+            }
+            "close" -> { popup.cancel(); mentionPopup = null }
+        }
+        return true
+    }
+
+    private fun showSlashPopup(query: String) {
+        mentionPopup?.cancel(); mentionPopup = null
+        val groups = SlashCatalog.group(query, SlashCatalog.build(cliCommands))
+        // commande déjà saisie en entier : inutile de la reproposer
+        val only = groups.singleOrNull()?.second?.singleOrNull()
+        if (groups.isEmpty() || only?.name.equals(query, ignoreCase = true)) return
+        val rows = groups.flatMap { (cat, l) ->
+            listOf(CompletionRow(cat, header = true)) +
+                l.map { CompletionRow("/${it.name}" + if (it.description.isBlank()) "" else " — ${it.description.take(70)}", value = "/${it.name}") }
+        }
+        showCompletion(rows) { cmd ->
+            val end = input.caretPosition.coerceAtMost(input.document.length)
+            input.text = "$cmd " + input.text.substring(end)
+            input.caretPosition = (cmd.length + 1).coerceAtMost(input.document.length)
         }
     }
 

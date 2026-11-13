@@ -36,6 +36,9 @@ fun parseRateLimits(j: JsonObject): RateLimits? {
 
 data class ProbeResult(val limits: RateLimits?, val error: String?)
 
+/** Commande slash exposée par la CLI (natives, personnalisées, skills, plugins). */
+data class CliCommand(val name: String, val description: String)
+
 data class McpEntry(val name: String, val url: String, val token: String?)
 
 class PermissionRequest(
@@ -284,6 +287,46 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
             else limits?.let { ProbeResult(it, null) }
                 ?: ProbeResult(null, err.toString().trim().ifEmpty { "la CLI n'a fourni aucune information de quota (compte API, proxy ou version sans cette donnée ?)" })
         } catch (e: Exception) { ProbeResult(null, "impossible de lancer la CLI : ${e.message}") }
+
+        /**
+         * Liste les commandes slash disponibles via la requête de contrôle `initialize` : aucun message n'est envoyé,
+         * donc aucun appel au modèle. Bloquant ; liste vide en cas d'échec.
+         */
+        fun listCommands(cli: String, cwd: String, timeoutSec: Long = 20): List<CliCommand> = try {
+            val cmd = listOf(cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence")
+            val p = ProcessBuilder(cmd).directory(java.io.File(cwd)).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            val w = p.outputStream.bufferedWriter()
+            w.write(JsonObject().apply {
+                addProperty("type", "control_request"); addProperty("request_id", "init-cmds")
+                add("request", JsonObject().apply { addProperty("subtype", "initialize") })
+            }.toString())
+            w.newLine(); w.flush()
+            var res: List<CliCommand> = emptyList()
+            val reader = Thread {
+                p.inputStream.bufferedReader().useLines { lines ->
+                    for (line in lines) {
+                        if (!line.startsWith("{") || !line.contains("init-cmds")) continue
+                        res = parseCommands(runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: continue)
+                        break
+                    }
+                }
+            }.apply { isDaemon = true; start() }
+            reader.join(timeoutSec * 1000)
+            runCatching { w.close() }
+            p.destroy()
+            res
+        } catch (_: Exception) { emptyList() }
+
+        /** Extrait les commandes d'une réponse `initialize` ; vide si le format est inattendu. */
+        fun parseCommands(j: JsonObject): List<CliCommand> {
+            val arr = j["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("response")?.takeIf { it.isJsonObject }
+                ?.asJsonObject?.get("commands")?.takeIf { it.isJsonArray }?.asJsonArray ?: return emptyList()
+            return arr.mapNotNull { e ->
+                val o = e.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+                val name = o["name"]?.takeIf { it.isJsonPrimitive }?.asString?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                CliCommand(name, o["description"]?.takeIf { it.isJsonPrimitive }?.asString.orEmpty().replace(Regex("\\s+"), " "))
+            }
+        }
 
         /** Question ponctuelle sans session ni outil (message de commit). Bloquant. */
         fun oneShot(cli: String, cwd: String, model: String, prompt: String, cancelled: () -> Boolean): String {

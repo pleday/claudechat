@@ -1,5 +1,10 @@
 # Changelog
 
+## Non publié
+
+- **Auto-complétion de `/`** : popup flottant au niveau du curseur, navigation ↑/↓, Entrée ou Tab pour valider, Échap pour fermer. Les commandes viennent de la CLI (requête `initialize`, sans appel au modèle), regroupées par catégorie, avec descriptions en français pour les commandes connues ; les raccourcis du plugin passent en premier
+- Même popup pour les mentions `@fichier` : liste préchargée à l'ouverture, dossiers cachés et fichiers ignorés exclus, fichiers ouverts puis récents proposés pour un `@` seul
+
 ## 0.7.0
 
 - **Ouverture du panneau plus rapide** : les actions de la barre d'outils et des menus se rafraîchissent hors du thread d'interface (`ActionUpdateThread.BGT`) (l'IDE signalait jusqu'à plusieurs secondes d'attente de ce thread au démarrage)

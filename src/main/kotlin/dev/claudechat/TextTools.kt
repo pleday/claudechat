@@ -48,6 +48,18 @@ object Mentions {
     }
 }
 
+/** Commande `/xxx` en cours de frappe, uniquement en tout début de saisie (seul endroit où elle est interprétée). */
+object SlashToken {
+    /** Requête (texte après le `/`) ou null si le curseur n'est pas dans une commande initiale. */
+    fun activeQuery(text: String, caret: Int): String? {
+        val before = text.substring(0, caret.coerceIn(0, text.length))
+        return Regex("""^/([\w:.-]*)$""").find(before)?.groupValues?.get(1)
+    }
+
+    fun filter(query: String, commands: Collection<String>): List<String> =
+        commands.filter { it.startsWith(query, ignoreCase = true) }.sorted()
+}
+
 /** Surlignage d'une recherche dans du HTML, sans toucher aux balises (FR-07). */
 object Highlight {
     fun apply(html: String, query: String, color: String = "#ffe08a"): String {
