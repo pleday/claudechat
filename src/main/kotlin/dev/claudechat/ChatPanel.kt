@@ -492,6 +492,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         add(north, BorderLayout.NORTH)
         add(splitter, BorderLayout.CENTER)
+        ring.onClick = { showContextDetails() }
         syncSend(); refreshModelButton(); refreshContextChip()
         project.messageBus.connect(parent).subscribe(
             com.intellij.openapi.fileEditor.FileEditorManagerListener.FILE_EDITOR_MANAGER,
@@ -825,7 +826,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun updateRing() {
         val window = contextWindows[activeModel ?: selectedModel] ?: 200_000
         ring.percent = (liveCtx.toLong() * 100 / window).toInt()
-        ring.toolTipText = "Contexte : ${"%,d".format(liveCtx)} / ${"%,d".format(window)} tokens (${ring.percent} %)"
+        ring.toolTipText = "Contexte : ${"%,d".format(liveCtx)} / ${"%,d".format(window)} tokens (${ring.percent} %) — cliquer pour le détail"
     }
 
     private fun updateStatus() {
@@ -881,7 +882,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val icon = BatteryIcon(remaining)
         batteryLabel.icon = icon
         batteryLabel.text = remaining?.let { "$it %" } ?: "?"
-        batteryLabel.toolTipText = (remaining?.let { "Session de 5 h : $it % restant" } ?: "Session de 5 h : pas encore mesurée") + ""
+        batteryLabel.toolTipText = (remaining?.let { "Session de 5 h : $it % restant" } ?: "Session de 5 h : pas encore mesurée") + " — cliquer pour le détail"
         content?.icon = icon
     }
 
@@ -893,6 +894,30 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             "réinitialisation dans ${Quota.remaining(reset, now)} (${java.time.format.DateTimeFormatter.ofPattern("EEE HH:mm").format(at)})"
         } else "fenêtre réinitialisée"
         return "<b>$title</b> : $used % utilisé · ${100 - used} % restant<br/><font color='gray'>$whenTxt</font>"
+    }
+
+    /**
+     * Détail du contexte au clic sur l'anneau. Mesuré par le processus vivant de la conversation s'il y en a un
+     * (exact) ; sinon la session est rechargée à part, sans serveurs MCP (approximatif).
+     */
+    private fun showContextDetails() {
+        val live = turn ?: idleTurn
+        val sid = session.id
+        val waiting = JBPopupFactory.getInstance()
+            .createComponentPopupBuilder(JBLabel("Mesure du contexte…").apply { border = JBUI.Borders.empty(8, 12) }, null)
+            .setCancelOnClickOutside(true).createPopup()
+        showAbove(waiting, ring, true)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val usage = live?.contextUsage() ?: CliTurn.contextUsage(settings.cliPath(), cwd, sid)
+            ApplicationManager.getApplication().invokeLater({
+                waiting.cancel()
+                if (usage == null) { Notifier.warn(project, "Contexte non mesuré : la CLI n'a pas répondu."); return@invokeLater }
+                val panel = JPanel(BorderLayout()).apply { border = JBUI.Borders.empty(10); add(JBLabel(contextReportHtml(usage)), BorderLayout.CENTER) }
+                val popup = JBPopupFactory.getInstance().createComponentPopupBuilder(panel, null)
+                    .setTitle("Contexte de la conversation").setResizable(false).setMovable(true).setCancelOnClickOutside(true).createPopup()
+                showAbove(popup, ring, true)
+            }, ModalityState.any())
+        }
     }
 
     /** Détail de l'utilisation, au clic sur la batterie. */

@@ -80,6 +80,14 @@ class FlatButton(text: String, icon: Icon? = null, private val onClick: (FlatBut
 class ContextRing : JComponent() {
     var percent: Int = 0
         set(v) { field = v.coerceIn(0, 100); repaint() }
+    var onClick: () -> Unit = {}
+
+    init {
+        cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent?) { onClick() }
+        })
+    }
 
     override fun getPreferredSize(): Dimension {
         val fm = getFontMetrics(font ?: UIUtil.getLabelFont())

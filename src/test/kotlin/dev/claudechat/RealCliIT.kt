@@ -108,4 +108,13 @@ class RealCliIT {
         assertTrue(info.models.any { it.isAlias && it.efforts.isNotEmpty() })
     }
 
+    /** `get_context_usage` sur un processus neuf : contexte de base (prompt système, outils), sans appel au modèle. */
+    @Test fun realBaseContextUsage() {
+        val u = CliTurn.contextUsage(ClaudeSettings.defaultCli(), System.getProperty("java.io.tmpdir"), null)
+        println("CONTEXT: $u")
+        assertNotNull(u, "la CLI n'a pas répondu à get_context_usage")
+        assertTrue(u!!.max > 0 && u.total > 0 && u.total < u.max)
+        assertTrue(u.categories.any { it.id == "system_prompt" && it.tokens > 0 })
+        assertTrue("Contexte :" in contextReportHtml(u))
+    }
 }

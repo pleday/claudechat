@@ -189,6 +189,9 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                         }
                     }
                     "control_response" -> j["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.let { resp ->
+                        resp["request_id"]?.asString?.let { rid ->
+                            pendingContext.remove(rid)?.complete(if (resp["subtype"]?.asString == "success") controlPayload(j) else null)
+                        }
                         if (resp["request_id"]?.asString?.startsWith("mcp-wait") == true)
                             mcpStatus = resp["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("mcpServers")?.takeIf { it.isJsonArray }
                                 ?.asJsonArray?.mapNotNull { e -> e.asJsonObject.let { o -> o["name"]?.asString?.let { n -> n to (o["status"]?.asString ?: "") } } }
@@ -270,8 +273,29 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         }
     }
 
-    @Synchronized private fun send(o: JsonObject) {
-        runCatching { out?.apply { write(o.toString()); newLine(); flush() } }
+    @Synchronized private fun send(o: JsonObject) { trySend(o) }
+
+    /** Écrit un message sur l'entrée de la CLI ; false si elle est fermée (le processus se termine) ou illisible. */
+    @Synchronized private fun trySend(o: JsonObject): Boolean =
+        runCatching { out!!.apply { write(o.toString()); newLine(); flush() } }.isSuccess
+
+    private val pendingContext = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CompletableFuture<JsonObject?>>()
+    private val contextSeq = java.util.concurrent.atomic.AtomicInteger()
+
+    /**
+     * Contexte de cette conversation, mesuré par le processus qui la porte (exact, serveurs MCP compris). Bloquant ;
+     * null si le processus est terminé, son entrée fermée, ou s'il ne répond pas dans [timeoutMs].
+     */
+    fun contextUsage(timeoutMs: Long = 8_000): ContextUsage? {
+        if (killed || proc?.isAlive != true) return null
+        val id = "ctx-${contextSeq.incrementAndGet()}"
+        val f = java.util.concurrent.CompletableFuture<JsonObject?>()
+        pendingContext[id] = f
+        val sent = trySend(controlRequest(id, "get_context_usage"))
+        if (!sent) { pendingContext.remove(id); return null }
+        return try { f.get(timeoutMs, TimeUnit.MILLISECONDS)?.let(::parseContextUsage) }
+        catch (_: Exception) { null }
+        finally { pendingContext.remove(id) }
     }
 
     /**
@@ -406,6 +430,18 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         }
 
         fun listCommands(cli: String, cwd: String, timeoutSec: Long = 20): List<CliCommand> = fetchInit(cli, cwd, timeoutSec).commands
+
+        /**
+         * Contexte d'une conversation mesuré hors de son processus : la session est rechargée (`--resume`) sans rien
+         * envoyer ni écrire. Les serveurs MCP ne sont pas démarrés : leurs outils ne sont pas comptés ([ContextUsage.approximate]).
+         * Sans [sessionId], seul le contexte de base (prompt système, outils) est mesuré. Bloquant ; null en cas d'échec.
+         */
+        fun contextUsage(cli: String, cwd: String, sessionId: String?, timeoutSec: Long = 30): ContextUsage? {
+            val args = baseArgs(cli) + (if (sessionId != null) listOf("--resume", sessionId) else emptyList()) + NO_MCP
+            val j = controlOnce(args, cwd, "ctx-once", "get_context_usage", timeoutSec) ?: return null
+            if (j["response"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("subtype")?.asString != "success") return null
+            return controlPayload(j)?.let(::parseContextUsage)?.copy(approximate = true)
+        }
 
         /** Extrait les commandes d'une réponse `initialize` ; vide si le format est inattendu. */
         fun parseCommands(j: JsonObject): List<CliCommand> {
