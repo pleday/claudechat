@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.7.0/claude-chat-0.7.0.zip" version="0.7.0">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.8.0/claude-chat-0.8.0.zip" version="0.8.0">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Ouverture du panneau plus rapide</b> : les actions de la barre d'outils et des menus se rafraîchissent hors du thread d'interface (<code>ActionUpdateThread.BGT</code>) (l'IDE signalait jusqu'à plusieurs secondes d'attente de ce thread au démarrage)</li>
-<li>Dépôt de mises à jour du plugin (<code>updatePlugins.xml</code>) pour que l'IDE identifie l'origine du plugin ; <code>make repo</code> le régénère</li>
-<li>Construction du plugin indépendante d'un second IDE (index de recherche des réglages désactivé), même quand <code>make run</code> est ouvert</li>
-<li><b>Serveurs MCP</b> : nouvelle fenêtre (liste groupée par portée Utilisateur / Projet / Local / claude.ai, badges de statut « Connecté », « Authentification requise », « Échec », détails dépliables avec secrets masqués, recherche, actualisation) et fenêtre « Ajouter un serveur MCP » (nom facultatif, portée, configuration JSON <code>mcpServers</code> ou d'un seul serveur). S'appuie sur <code>claude mcp list / add-json / remove</code> ; remplace l'ancien tableau des réglages</li>
+<li>Icône du plugin (clair et sombre) pour le Marketplace et la fenêtre des plugins</li>
+<li><b>Permissions « Stream closed »</b> : l'entrée de la CLI n'est plus fermée dès la fin d'un tour mais quand elle est silencieuse (1,5 s, plafond 2 min), pour ne plus faire échouer les permissions d'un travail qui continue. Une permission demandée après la fin du tour est refusée avec un message clair (et une notice dans le panneau) ; les événements tardifs sont journalisés dans <code>idea.log</code></li>
+<li><b>Auto-complétion de <code>/</code></b> : popup flottant au niveau du curseur, navigation ↑/↓, Entrée ou Tab pour valider, Échap pour fermer. Les commandes viennent de la CLI (requête <code>initialize</code>, sans appel au modèle), regroupées par catégorie, avec descriptions en français pour les commandes connues ; les raccourcis du plugin passent en premier</li>
+<li>Même popup pour les mentions <code>@fichier</code> : liste préchargée à l'ouverture, dossiers cachés et fichiers ignorés exclus, fichiers ouverts puis récents proposés pour un <code>@</code> seul</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
