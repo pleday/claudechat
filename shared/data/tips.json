@@ -1,0 +1,15 @@
+[
+  "Tape @ pour mentionner un fichier du projet : il est joint au message.",
+  "Tape / pour une commande : /explain, /fix, /tests, /doc, /review, ou toute commande de la CLI.",
+  "Entrée envoie, Maj+Entrée ajoute une ligne, Échap interrompt Claude.",
+  "Pendant une réponse, « Préciser » ajuste la consigne sans interrompre ; « Mettre en file d'attente » envoie le message après.",
+  "Colle une image avec Ctrl+V, ou joins des fichiers, images et vidéos avec le bouton +.",
+  "Une vidéo jointe devient quelques images (via ffmpeg) ; la piste audio n'est pas transmise.",
+  "Clic droit sur du code, puis « Envoyer la sélection à Claude Chat ».",
+  "La batterie en bas indique ton quota de 5 h : clique dessus pour le détail sur 5 h et 7 jours.",
+  "Active l'interrupteur 📱 pour répondre à Claude depuis ton téléphone, via Telegram.",
+  "Le mode « Plan » fait proposer un plan à valider avant toute action.",
+  "Active la reprise automatique : Claude repart seul quand ton quota se réinitialise.",
+  "Clique sur le fichier courant (sous la saisie) pour joindre ou non le contexte de l'éditeur.",
+  "Ouvre plusieurs conversations avec le + de la fenêtre, ou reprends une ancienne session avec l'horloge."
+]

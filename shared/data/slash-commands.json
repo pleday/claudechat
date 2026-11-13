@@ -1,0 +1,260 @@
+{
+  "pluginCategory": "Raccourcis du plugin",
+  "categories": [
+    "Raccourcis du plugin",
+    "Session",
+    "Configuration",
+    "Code et revue",
+    "Agents et automatisation",
+    "Diagnostic",
+    "Skills et extensions",
+    "Plugins"
+  ],
+  "hidden": [
+    "workflow-launch-exec",
+    "extra-usage",
+    "design-consent",
+    "design-revoke"
+  ],
+  "local": {
+    "explain": "Expliquer le code sélectionné",
+    "fix": "Trouver et corriger les bugs",
+    "tests": "Écrire des tests unitaires",
+    "doc": "Ajouter de la documentation",
+    "review": "Revue de code par gravité"
+  },
+  "known": {
+    "clear": {
+      "category": "Session",
+      "description": "Nouvelle session avec un contexte vide"
+    },
+    "compact": {
+      "category": "Session",
+      "description": "Résumer la conversation pour libérer du contexte"
+    },
+    "context": {
+      "category": "Session",
+      "description": "Afficher l'utilisation du contexte"
+    },
+    "rename": {
+      "category": "Session",
+      "description": "Renommer la conversation"
+    },
+    "usage": {
+      "category": "Session",
+      "description": "Coût de la session et usage du forfait"
+    },
+    "usage-credits": {
+      "category": "Session",
+      "description": "Configurer ou demander des crédits d'usage"
+    },
+    "recap": {
+      "category": "Session",
+      "description": "Générer un récapitulatif d'une ligne"
+    },
+    "focus": {
+      "category": "Session",
+      "description": "Vue épurée : demande, résumé et réponse"
+    },
+    "color": {
+      "category": "Session",
+      "description": "Couleur de la barre de saisie"
+    },
+    "goal": {
+      "category": "Session",
+      "description": "Définir un objectif : continuer jusqu'à l'atteindre"
+    },
+    "insights": {
+      "category": "Session",
+      "description": "Rapport d'analyse de vos sessions"
+    },
+    "model": {
+      "category": "Configuration",
+      "description": "Choisir le modèle"
+    },
+    "effort": {
+      "category": "Configuration",
+      "description": "Régler le niveau d'effort"
+    },
+    "fast": {
+      "category": "Configuration",
+      "description": "Activer ou désactiver le mode rapide"
+    },
+    "config": {
+      "category": "Configuration",
+      "description": "Modifier un réglage par sa clé"
+    },
+    "output-style": {
+      "category": "Configuration",
+      "description": "Lister ou changer le style de sortie"
+    },
+    "mcp": {
+      "category": "Configuration",
+      "description": "Gérer les serveurs MCP"
+    },
+    "autocompact": {
+      "category": "Configuration",
+      "description": "Taille de la fenêtre d'auto-compactage"
+    },
+    "advisor": {
+      "category": "Configuration",
+      "description": "Consulter un modèle plus puissant aux moments clés"
+    },
+    "auto-mode-setup": {
+      "category": "Configuration",
+      "description": "Adapter le mode auto à votre environnement"
+    },
+    "import": {
+      "category": "Configuration",
+      "description": "Importer la config d'un autre agent de code"
+    },
+    "update-config": {
+      "category": "Configuration",
+      "description": "Configurer Claude Code (settings.json, hooks, permissions)"
+    },
+    "fewer-permission-prompts": {
+      "category": "Configuration",
+      "description": "Réduire les demandes d'autorisation (liste d'autorisations)"
+    },
+    "reload-plugins": {
+      "category": "Configuration",
+      "description": "Activer les changements de plugins"
+    },
+    "reload-skills": {
+      "category": "Configuration",
+      "description": "Recharger les skills modifiés sur disque"
+    },
+    "init": {
+      "category": "Code et revue",
+      "description": "Créer un CLAUDE.md documentant le code"
+    },
+    "code-review": {
+      "category": "Code et revue",
+      "description": "Revue du diff, d'une PR ou d'une branche"
+    },
+    "security-review": {
+      "category": "Code et revue",
+      "description": "Revue de sécurité des changements en cours"
+    },
+    "simplify": {
+      "category": "Code et revue",
+      "description": "Simplifier et nettoyer le code modifié"
+    },
+    "verify": {
+      "category": "Code et revue",
+      "description": "Vérifier qu'un changement fait ce qu'il doit"
+    },
+    "debug": {
+      "category": "Code et revue",
+      "description": "Activer les logs de debug et diagnostiquer"
+    },
+    "run": {
+      "category": "Code et revue",
+      "description": "Lancer l'application pour voir un changement"
+    },
+    "run-skill-generator": {
+      "category": "Code et revue",
+      "description": "Créer le skill de lancement du projet"
+    },
+    "batch": {
+      "category": "Code et revue",
+      "description": "Planifier puis exécuter un grand changement en parallèle"
+    },
+    "claude-api": {
+      "category": "Code et revue",
+      "description": "Référence de l'API Claude / SDK Anthropic"
+    },
+    "agents": {
+      "category": "Agents et automatisation",
+      "description": "Créer ou gérer des sous-agents"
+    },
+    "list-agents": {
+      "category": "Agents et automatisation",
+      "description": "Lister sous-agents et sessions joignables"
+    },
+    "loop": {
+      "category": "Agents et automatisation",
+      "description": "Répéter un prompt à intervalle régulier"
+    },
+    "schedule": {
+      "category": "Agents et automatisation",
+      "description": "Planifier des agents cloud (routines)"
+    },
+    "deep-research": {
+      "category": "Agents et automatisation",
+      "description": "Recherche approfondie avec rapport sourcé"
+    },
+    "workflow-authoring": {
+      "category": "Agents et automatisation",
+      "description": "Référence pour écrire un script de workflow"
+    },
+    "team-onboarding": {
+      "category": "Agents et automatisation",
+      "description": "Guide d'intégration pour l'équipe"
+    },
+    "doctor": {
+      "category": "Diagnostic",
+      "description": "Vérifier l'installation et corriger les problèmes"
+    },
+    "heapdump": {
+      "category": "Diagnostic",
+      "description": "Exporter le tas JS sur le Bureau"
+    },
+    "skill-doctor": {
+      "category": "Diagnostic",
+      "description": "Skills inutilisés qui coûtent du contexte"
+    },
+    "design": {
+      "category": "Skills et extensions",
+      "description": "Accès de Claude à vos projets Design"
+    },
+    "design-sync": {
+      "category": "Skills et extensions",
+      "description": "Envoyer un design system vers claude.ai/design"
+    },
+    "dataviz": {
+      "category": "Skills et extensions",
+      "description": "Graphiques et visualisations de données"
+    },
+    "plugin-authoring": {
+      "category": "Skills et extensions",
+      "description": "Créer ou déboguer un mod / plugin"
+    },
+    "docs": {
+      "category": "Skills et extensions",
+      "description": "Documents éditables partagés"
+    },
+    "docx": {
+      "category": "Skills et extensions",
+      "description": "Documents Word (.docx)"
+    },
+    "pdf": {
+      "category": "Skills et extensions",
+      "description": "Lire, créer ou modifier des PDF"
+    },
+    "pptx": {
+      "category": "Skills et extensions",
+      "description": "Présentations PowerPoint (.pptx)"
+    },
+    "xlsx": {
+      "category": "Skills et extensions",
+      "description": "Tableurs (.xlsx, .csv)"
+    },
+    "google-workspace": {
+      "category": "Skills et extensions",
+      "description": "Fichiers Google Docs, Sheets et Slides"
+    },
+    "import-memory": {
+      "category": "Skills et extensions",
+      "description": "Importer une mémoire depuis un autre assistant"
+    },
+    "morning": {
+      "category": "Skills et extensions",
+      "description": "Brief du matin"
+    },
+    "skill-creator": {
+      "category": "Skills et extensions",
+      "description": "Créer ou améliorer un skill"
+    }
+  }
+}

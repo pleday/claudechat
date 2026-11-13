@@ -36,6 +36,14 @@ tasks.test {
 
 kotlin { jvmToolchain(21) }
 
+// Ressources communes avec l'extension VS Code (../shared) : icône, avatar, astuces et catalogue des commandes slash.
+tasks.processResources {
+    from("../shared/data") { into("shared") }
+    from("../shared/assets") { include("avatar.png"); into("images") }
+    from("../shared/assets") { include("claude.svg"); into("icons") }
+    from("../shared/assets") { include("pluginIcon*.svg"); into("META-INF") }
+}
+
 // IDE de test (`make run`) : l'IDE 2024.3 plante au démarrage dans son plugin Gradle (« IllegalArgumentException: 25 »). Il relit
 // les versions de Java récentes qu'il a téléchargées (jusqu'à 26) et ne sait plus les analyser. Claude Chat n'utilise pas Gradle :
 // on désactive ce plugin (et ceux qui en dépendent) dans le sandbox seulement, jamais dans l'IDE de l'utilisateur.

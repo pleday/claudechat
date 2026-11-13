@@ -3,6 +3,12 @@ package dev.claudechat
 /** Une commande slash proposée à la saisie, avec sa catégorie et sa description (en français quand elle est connue). */
 data class SlashEntry(val name: String, val category: String, val description: String)
 
+/** Lit les données communes avec l'extension VS Code (`shared/data`, copiées dans les ressources au build). */
+object SharedData {
+    fun read(name: String): com.google.gson.JsonElement =
+        SharedData::class.java.getResourceAsStream("/shared/$name")!!.bufferedReader(Charsets.UTF_8).use { com.google.gson.JsonParser.parseReader(it) }
+}
+
 /** Regroupe et traduit les commandes slash : raccourcis du plugin + commandes renvoyées par la CLI. */
 object SlashCatalog {
     const val PLUGIN = "Raccourcis du plugin"
@@ -14,86 +20,22 @@ object SlashCatalog {
     const val SKILLS = "Skills et extensions"
     const val PLUGINS = "Plugins"
 
+    private val data = SharedData.read("slash-commands.json").asJsonObject
+
+    private fun strings(o: com.google.gson.JsonObject) = o.entrySet().associate { it.key to it.value.asString }
+
     /** Ordre d'affichage des groupes. */
-    val ORDER = listOf(PLUGIN, SESSION, CONFIG, CODE, AGENTS, DIAG, SKILLS, PLUGINS)
+    val ORDER: List<String> = data["categories"].asJsonArray.map { it.asString }
 
     /** Commandes internes de la CLI, sans intérêt pour l'utilisateur. */
-    private val hidden = setOf("workflow-launch-exec", "extra-usage", "design-consent", "design-revoke")
+    private val hidden: Set<String> = data["hidden"].asJsonArray.map { it.asString }.toSet()
 
-    private val local = mapOf(
-        "explain" to "Expliquer le code sélectionné",
-        "fix" to "Trouver et corriger les bugs",
-        "tests" to "Écrire des tests unitaires",
-        "doc" to "Ajouter de la documentation",
-        "review" to "Revue de code par gravité",
-    )
+    private val local: Map<String, String> = strings(data["local"].asJsonObject)
 
     /** Catégorie et description française des commandes connues de la CLI. */
-    private val known: Map<String, Pair<String, String>> = mapOf(
-        "clear" to (SESSION to "Nouvelle session avec un contexte vide"),
-        "compact" to (SESSION to "Résumer la conversation pour libérer du contexte"),
-        "context" to (SESSION to "Afficher l'utilisation du contexte"),
-        "rename" to (SESSION to "Renommer la conversation"),
-        "usage" to (SESSION to "Coût de la session et usage du forfait"),
-        "usage-credits" to (SESSION to "Configurer ou demander des crédits d'usage"),
-        "recap" to (SESSION to "Générer un récapitulatif d'une ligne"),
-        "focus" to (SESSION to "Vue épurée : demande, résumé et réponse"),
-        "color" to (SESSION to "Couleur de la barre de saisie"),
-        "goal" to (SESSION to "Définir un objectif : continuer jusqu'à l'atteindre"),
-        "insights" to (SESSION to "Rapport d'analyse de vos sessions"),
-
-        "model" to (CONFIG to "Choisir le modèle"),
-        "effort" to (CONFIG to "Régler le niveau d'effort"),
-        "fast" to (CONFIG to "Activer ou désactiver le mode rapide"),
-        "config" to (CONFIG to "Modifier un réglage par sa clé"),
-        "output-style" to (CONFIG to "Lister ou changer le style de sortie"),
-        "mcp" to (CONFIG to "Gérer les serveurs MCP"),
-        "autocompact" to (CONFIG to "Taille de la fenêtre d'auto-compactage"),
-        "advisor" to (CONFIG to "Consulter un modèle plus puissant aux moments clés"),
-        "auto-mode-setup" to (CONFIG to "Adapter le mode auto à votre environnement"),
-        "import" to (CONFIG to "Importer la config d'un autre agent de code"),
-        "update-config" to (CONFIG to "Configurer Claude Code (settings.json, hooks, permissions)"),
-        "fewer-permission-prompts" to (CONFIG to "Réduire les demandes d'autorisation (liste d'autorisations)"),
-        "reload-plugins" to (CONFIG to "Activer les changements de plugins"),
-        "reload-skills" to (CONFIG to "Recharger les skills modifiés sur disque"),
-
-        "init" to (CODE to "Créer un CLAUDE.md documentant le code"),
-        "code-review" to (CODE to "Revue du diff, d'une PR ou d'une branche"),
-        "security-review" to (CODE to "Revue de sécurité des changements en cours"),
-        "simplify" to (CODE to "Simplifier et nettoyer le code modifié"),
-        "verify" to (CODE to "Vérifier qu'un changement fait ce qu'il doit"),
-        "debug" to (CODE to "Activer les logs de debug et diagnostiquer"),
-        "run" to (CODE to "Lancer l'application pour voir un changement"),
-        "run-skill-generator" to (CODE to "Créer le skill de lancement du projet"),
-        "batch" to (CODE to "Planifier puis exécuter un grand changement en parallèle"),
-        "claude-api" to (CODE to "Référence de l'API Claude / SDK Anthropic"),
-
-        "agents" to (AGENTS to "Créer ou gérer des sous-agents"),
-        "list-agents" to (AGENTS to "Lister sous-agents et sessions joignables"),
-        "loop" to (AGENTS to "Répéter un prompt à intervalle régulier"),
-        "schedule" to (AGENTS to "Planifier des agents cloud (routines)"),
-        "deep-research" to (AGENTS to "Recherche approfondie avec rapport sourcé"),
-        "workflow-authoring" to (AGENTS to "Référence pour écrire un script de workflow"),
-        "team-onboarding" to (AGENTS to "Guide d'intégration pour l'équipe"),
-
-        "doctor" to (DIAG to "Vérifier l'installation et corriger les problèmes"),
-        "heapdump" to (DIAG to "Exporter le tas JS sur le Bureau"),
-        "skill-doctor" to (DIAG to "Skills inutilisés qui coûtent du contexte"),
-
-        "design" to (SKILLS to "Accès de Claude à vos projets Design"),
-        "design-sync" to (SKILLS to "Envoyer un design system vers claude.ai/design"),
-        "dataviz" to (SKILLS to "Graphiques et visualisations de données"),
-        "plugin-authoring" to (SKILLS to "Créer ou déboguer un mod / plugin"),
-        "docs" to (SKILLS to "Documents éditables partagés"),
-        "docx" to (SKILLS to "Documents Word (.docx)"),
-        "pdf" to (SKILLS to "Lire, créer ou modifier des PDF"),
-        "pptx" to (SKILLS to "Présentations PowerPoint (.pptx)"),
-        "xlsx" to (SKILLS to "Tableurs (.xlsx, .csv)"),
-        "google-workspace" to (SKILLS to "Fichiers Google Docs, Sheets et Slides"),
-        "import-memory" to (SKILLS to "Importer une mémoire depuis un autre assistant"),
-        "morning" to (SKILLS to "Brief du matin"),
-        "skill-creator" to (SKILLS to "Créer ou améliorer un skill"),
-    )
+    private val known: Map<String, Pair<String, String>> = data["known"].asJsonObject.entrySet().associate { (n, v) ->
+        n to (v.asJsonObject["category"].asString to v.asJsonObject["description"].asString)
+    }
 
     /** Liste complète : raccourcis du plugin d'abord, puis la CLI ; le plugin l'emporte en cas de doublon. */
     fun build(cli: List<CliCommand>): List<SlashEntry> {
