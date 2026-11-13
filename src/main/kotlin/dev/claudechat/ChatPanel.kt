@@ -128,8 +128,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     // Messages empilés pendant que Claude travaille (FR-09)
     private val queue = mutableListOf<String>()
 
-    private val responseTexts = ArrayList<String>()
-    private val codeTexts = ArrayList<String>()
+    private var codeTexts: List<String> = emptyList()
     private var copyPayload: String? = null
 
     private val view = JEditorPane().apply {
@@ -707,7 +706,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onToolResult(id: String, text: String, isError: Boolean) = ui(gen) {
             val e = session.entries.firstOrNull { it.toolId == id }
             e?.result = text; e?.isError = isError
-            if (e?.toolName?.let { it in WRITE_TOOLS } == true) { linker.invalidate(); scheduleRefresh(e) }
+            if (e?.toolName?.let { it in WRITE_TOOLS } == true) { renderer.linker.invalidate(); scheduleRefresh(e) }
             scheduleRender()
         }
         override fun onPermission(req: PermissionRequest) = ui(gen) {
@@ -1062,8 +1061,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     // ---------- Diff (FR-30..32) ----------
-
-    private fun filePathOf(input: JsonObject): String? = (input["file_path"] ?: input["path"])?.asString
 
     private fun showDiff(req: PermissionRequest) {
         val path = filePathOf(req.input) ?: return
@@ -1616,9 +1613,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         OpenFileDescriptor(project, vf, line.coerceAtLeast(0), 0).navigate(true)
     }
 
-    private val linker = Linkify({ cwd })
-    private val renders = RenderCache()
-
     // ---------- Rendu ----------
 
     private fun scheduleRender() {
@@ -1637,7 +1631,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         titleLabel.text = customTitle ?: session.title
         content?.displayName = tabTitle()
         syncSend()
-        val html = Highlight.apply(buildHtml(), searchQuery)
+        view.background = UIUtil.getEditorPaneBackground()
+        val built = renderer.build(session.entries, TranscriptRenderer.Options(showThinking, showTools, activeModel, streaming), theme())
+        codeTexts = built.codeTexts
+        val html = Highlight.apply(built.html, searchQuery)
         if (html != lastHtml) { view.text = html; lastHtml = html }
         // FR-08 : ne pas faire sauter le défilement si l'utilisateur est remonté.
         SwingUtilities.invokeLater { bar.value = if (atBottom) bar.maximum else oldValue }
@@ -1654,82 +1651,18 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         render()
     }
 
-    private fun hex(c: Color) = "#%02x%02x%02x".format(c.red, c.green, c.blue)
     private fun esc(s: String) = StringUtil.escapeXmlEntities(s)
 
-    private fun buildHtml(): String {
+    private val renderer = TranscriptRenderer { cwd }
+
+    private fun theme(): TranscriptRenderer.Theme {
         val font = UIUtil.getLabelFont()
-        val codeFont = EditorColorsManager.getInstance().globalScheme.editorFontName
-        val fg = UIUtil.getLabelForeground()
-        val link = JBUI.CurrentTheme.Link.Foreground.ENABLED
-        val userBg = JBColor(Color(0xE8F0FE), Color(0x2D3748))
-        val codeBg = JBColor(Color(0xF3F3F3), Color(0x2B2D30))
-        val you = JBColor(Color(0x2F6FDE), Color(0x6EA8FE))
-        view.background = UIUtil.getEditorPaneBackground()
-
-        val sb = StringBuilder()
-        sb.append("<html><head><style>")
-        sb.append("body{font-family:'${font.family}';font-size:${font.size}pt;color:${hex(fg)};}")
-        sb.append("td.cb{background-color:${hex(codeBg)};padding:6px;}")
-        sb.append("pre{background-color:${hex(codeBg)};padding:6px;}")
-        sb.append("code,pre{font-family:'$codeFont';font-size:${font.size - 1}pt;}")
-        sb.append("a{color:${hex(link)};}")
-        sb.append("</style></head><body>")
-        var lastRole = ""
-        responseTexts.clear(); codeTexts.clear()
-        renders.retainOnly(session.entries)
-        var respOpen = false
-        for (e in session.entries) {
-            if (e.kind == Kind.USER && respOpen) { sb.append("</div>"); respOpen = false }
-            when (e.kind) {
-                Kind.USER -> {
-                    lastRole = "user"
-                    sb.append("<table cellpadding='0' cellspacing='0'><tr><td height='8'></td></tr></table>")
-                    sb.append("<table width='100%' cellpadding='0' cellspacing='0'><tr><td width='4' bgcolor='${hex(you)}'>&nbsp;</td><td bgcolor='${hex(userBg)}'>")
-                    sb.append("<table cellpadding='7' cellspacing='0'><tr><td>")
-                    sb.append(speakerLabel("Vous", hex(you), listOfNotNull(e.attached?.let { "joint : $it" }, e.note).joinToString(" · ")))
-                    sb.append("<br/>").append(renders.render(e, e.text) { Md.toHtml(e.text) }).append("</td></tr></table></td></tr></table>")
-                }
-                else -> {
-                    if (lastRole != "claude" && e.kind != Kind.NOTICE && e.kind != Kind.ERROR) {
-                        sb.append("<div id='resp${responseTexts.size}'>"); respOpen = true; responseTexts.add("")
-                        sb.append(assistantHeader(hex(ACCENT), (e.model ?: activeModel)?.let { ModelCatalog.label(it) }, gap = lastRole != ""))
-                        lastRole = "claude"
-                    }
-                    when (e.kind) {
-                        Kind.TEXT -> {
-                            sb.append(renders.render(e, e.text to linker.stamp(), codeTexts) { c -> linker.images(linker.files(Md.toHtml(e.text, c))) })
-                            if (responseTexts.isNotEmpty()) responseTexts[responseTexts.lastIndex] = (responseTexts.last() + "\n\n" + e.text).trim()
-                        }
-                        Kind.THINKING -> if (showThinking) sb.append("<blockquote><font color='gray'><i>${esc(e.text).replace("\n", "<br/>")}</i></font></blockquote>")
-                        Kind.TOOL -> if (showTools) sb.append(renders.render(e, listOf(e.result, e.isError, codeBg.rgb, linker.stamp())) { toolCard(e, codeBg) })
-                        Kind.NOTICE -> sb.append("<p><font color='gray'><i>${esc(e.text)}</i></font></p>")
-                        Kind.ERROR -> sb.append("<p><font color='red'><b>Erreur :</b> ${esc(e.text)}</font></p>")
-                        else -> {}
-                    }
-                }
-            }
-        }
-        if (respOpen) sb.append("</div>")
-        if (streaming && session.entries.lastOrNull()?.kind == Kind.USER) sb.append("<p>…</p>")
-        sb.append("</body></html>")
-        return sb.toString()
-    }
-
-    private fun toolCard(e: Entry, bg: Color): String {
-        val input = e.input ?: JsonObject()
-        val status = when { e.result == null -> "⏳"; e.isError -> "✗"; else -> "✓" }
-        val summary = toolSummary(e.toolName ?: "?", input)
-        val path = filePathOf(input)
-        val label = if (path != null) {
-            val rel = path.removePrefix("$cwd/")
-            "<a href=\"open:${esc(path)}\">${esc(rel)}</a>"
-        } else linker.images("<code>${esc(summary.take(200))}</code>", inCode = true)
-        val res = e.result?.takeIf { it.isNotBlank() && showTools }?.let {
-            "<br/><font color='${if (e.isError) "red" else "gray"}' size='-1'>${esc(it.take(500)).replace("\n", "<br/>")}</font>"
-        } ?: ""
-        return "<table width='100%' cellpadding='4' cellspacing='0'><tr><td bgcolor='${hex(bg)}'>" +
-            "<b>$status ${esc(e.toolName ?: "?")}</b> $label$res</td></tr></table>"
+        return TranscriptRenderer.Theme(
+            font.family, font.size, EditorColorsManager.getInstance().globalScheme.editorFontName,
+            UIUtil.getLabelForeground(), JBUI.CurrentTheme.Link.Foreground.ENABLED,
+            JBColor(Color(0xE8F0FE), Color(0x2D3748)), JBColor(Color(0xF3F3F3), Color(0x2B2D30)),
+            JBColor(Color(0x2F6FDE), Color(0x6EA8FE)), ACCENT,
+        )
     }
 
     companion object {
