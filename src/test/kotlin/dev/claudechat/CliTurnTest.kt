@@ -69,6 +69,32 @@ echo '{"type":"result","is_error":false,"total_cost_usd":0.5,"usage":{"input_tok
         )
     }
 
+    @Test fun keepsInputOpenAndResumesAfterResult() {
+        val out = tmp.resolve("after.txt")
+        // 1er result, puis la CLI reprend (tâche de fond) et demande une permission ; la réponse doit lui parvenir
+        val cli = fake("""
+read -r line
+echo '{"type":"result","is_error":false}'
+sleep 1
+echo '{"type":"control_request","request_id":"r9","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{}}}'
+read -r answer
+echo "${'$'}answer" > $out
+echo '{"type":"result","is_error":false}'
+""")
+        val rec = object : TurnListener {
+            val events = CopyOnWriteArrayList<String>()
+            val second = CountDownLatch(2)
+            lateinit var turn: CliTurn
+            override fun onResumed() { events += "resumed" }
+            override fun onPermission(req: PermissionRequest) { events += "perm:${req.tool}"; turn.allow(req.requestId, req.input) }
+            override fun onDone(isError: Boolean, message: String?) { events += "done:$isError"; second.countDown() }
+        }
+        val t = CliTurn(opts(cli), prompt, rec); rec.turn = t; t.start()
+        assertTrue(rec.second.await(15, TimeUnit.SECONDS), "événements : ${rec.events}")
+        assertEquals(listOf("done:false", "resumed", "perm:Bash", "done:false"), rec.events.toList())
+        assertTrue(Files.readString(out).contains("\"behavior\":\"allow\""))
+    }
+
     @Test fun sendsUserMessageAsStreamJson() {
         val out = tmp.resolve("stdin.txt")
         val cli = fake("""read -r line; echo "${'$'}line" > $out; echo '{"type":"result","is_error":false}'""")

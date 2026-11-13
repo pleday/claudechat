@@ -77,8 +77,8 @@ interface TurnListener {
     /** Précisions envoyées mais non consommées avant la fin du tour : à renvoyer comme nouveau message. */
     fun onRefineLost(texts: List<String>) {}
     fun onDone(isError: Boolean, message: String?) {}
-    /** Demande de permission arrivée après la fin du tour : refusée automatiquement (plus de réponse possible côté IDE). */
-    fun onLatePermission(tool: String) {}
+    /** La CLI a repris du travail après un `result` (tâche de fond, message empilé…) : le tour est de nouveau en cours. */
+    fun onResumed() {}
 }
 
 /**
@@ -130,7 +130,12 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                 lastActivity = System.nanoTime()
                 if (!line.startsWith("{")) return@forEachLine
                 val j = runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: return@forEachLine
-                if (ended && j["type"]?.asString != "result") LOG.info("Événement « ${j["type"]?.asString}/${j["subtype"]?.asString ?: ""} » reçu après la fin du tour")
+                if (ended && j["type"]?.asString in RESUME_EVENTS) {
+                    // la CLI continue après un `result` : on garde l'entrée ouverte et on repasse en « en cours »
+                    LOG.info("Activité « ${j["type"]?.asString} » après un result : tour repris")
+                    ended = false; finished = false
+                    l.onResumed()
+                }
                 when (j["type"]?.asString) {
                     "system" -> if (j["subtype"]?.asString == "init")
                         l.onInit(j["session_id"].asString, j["model"]?.asString)
@@ -154,12 +159,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                     "rate_limit_event" -> parseRateLimits(j)?.let(l::onRateLimits)
                     "control_request" -> {
                         val r = j["request"].asJsonObject
-                        if (r["subtype"]?.asString == "can_use_tool" && ended) {
-                            // le tour est déjà terminé côté IDE : personne ne peut répondre, on refuse proprement
-                            LOG.warn("Permission demandée après la fin du tour : ${r["tool_name"]?.asString}")
-                            deny(j["request_id"].asString, "La réponse précédente est terminée : relancez la demande dans un nouveau message.")
-                            l.onLatePermission(r["tool_name"]?.asString ?: "?")
-                        } else if (r["subtype"]?.asString == "can_use_tool") {
+                        if (r["subtype"]?.asString == "can_use_tool") {
                             l.onPermission(PermissionRequest(
                                 j["request_id"].asString, r["tool_name"].asString,
                                 r["input"]?.asJsonObject ?: JsonObject(), r["description"]?.asString ?: "",
@@ -190,16 +190,16 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
     }
 
     /**
-     * Ferme l'entrée (le processus se termine) seulement quand la CLI est silencieuse : fermer dès le `result`
-     * faisait échouer les permissions d'un travail encore en cours (« Stream closed »). Plafonné à 2 min.
+     * Ferme l'entrée (le processus se termine) seulement quand la CLI est restée silencieuse un long moment après
+     * le `result`. La fermer tout de suite faisait échouer les permissions d'un travail qui reprend (« Stream closed »).
+     * Si l'activité reprend, [ended] repasse à false et ce guetteur s'arrête ; le `result` suivant en relance un autre.
      */
     private fun closeInputWhenQuiet() {
         Thread({
-            val deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2)
-            do {
-                Thread.sleep(1500)
-            } while (System.nanoTime() - lastActivity < TimeUnit.MILLISECONDS.toNanos(1500) && System.nanoTime() < deadline && proc?.isAlive == true)
-            runCatching { out?.close() }
+            while (ended && !killed && proc?.isAlive == true) {
+                Thread.sleep(2000)
+                if (ended && System.nanoTime() - lastActivity > QUIET_BEFORE_CLOSE_NS) { runCatching { out?.close() }; return@Thread }
+            }
         }, "claude-close").apply { isDaemon = true }.start()
     }
 
@@ -278,6 +278,9 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
 
     companion object {
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(CliTurn::class.java)
+        private val RESUME_EVENTS = setOf("stream_event", "assistant", "control_request")
+        /** Silence après un `result` avant de fermer l'entrée de la CLI. */
+        var QUIET_BEFORE_CLOSE_NS = TimeUnit.MINUTES.toNanos(3)
 
         private fun mcpJson(list: List<McpEntry>) = JsonObject().apply {
             add("mcpServers", JsonObject().also { s ->

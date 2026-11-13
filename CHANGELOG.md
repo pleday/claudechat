@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+
+- **Permissions « Stream closed » (suite)** : la CLI peut reprendre du travail après un `result` (tâche de fond, message empilé). Le plugin garde alors l'entrée ouverte (fermeture seulement après 3 min de silence), repasse en « en cours » et affiche normalement les demandes de permission, au lieu de les perdre. Le processus d'un tour terminé est arrêté dès qu'un nouveau message est envoyé
+
 ## 0.8.0
 
 - Icône du plugin (clair et sombre) pour le Marketplace et la fenêtre des plugins

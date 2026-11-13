@@ -76,6 +76,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var generation = 0
     private var renderPending = false
     private var turn: CliTurn? = null
+    private var idleTurn: CliTurn? = null
     private var interrupted = false
     private var forkNext = false
     private var remoteOn = settings.state.remoteDefault
@@ -445,7 +446,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     @Volatile private var cliCommands: List<CliCommand> = emptyList()
 
-    fun shutdown() { resumeAt = 0; RemoteBridge.unregister(phoneSink); abandonTurn() }
+    fun shutdown() { idleTurn?.kill(); idleTurn = null; resumeAt = 0; RemoteBridge.unregister(phoneSink); abandonTurn() }
 
     // ---------- Barre d'outils ----------
 
@@ -573,6 +574,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         interrupted = false
         openKind = null
         val gen = ++generation
+        idleTurn?.kill(); idleTurn = null // le nouveau message ouvre son propre processus
         turnStart = System.currentTimeMillis(); liveOut = 0; lastLimits = null
         tick()
         val model = selectedModel.ifBlank { settings.state.model }
@@ -633,9 +635,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             usageIn += input; usageOut += output; this@ChatPanel.costUsd += costUsd; updateUsage()
         }
         override fun onDone(isError: Boolean, message: String?) = ui(gen) { finish(isError, message) }
-        override fun onLatePermission(tool: String) = ui(gen) {
-            session.entries.add(Entry(Kind.NOTICE, "Claude a demandé l'autorisation « $tool » après la fin de sa réponse : refusée automatiquement. Renvoyez votre demande dans un nouveau message."))
-            scheduleRender()
+        override fun onResumed() = ui(gen) {
+            if (streaming) return@ui
+            streaming = true; interrupted = false; openKind = null
+            turn = idleTurn
+            turnStart = System.currentTimeMillis(); liveOut = 0
+            tick(); syncSend()
         }
     }
 
@@ -776,6 +781,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun finish(isError: Boolean, message: String?) {
         streaming = false
+        idleTurn = turn // process gardé ouvert un moment : la CLI peut reprendre (tâche de fond), voir onResumed
         turn = null
         clearInteractions("Réponse terminée", deny = false)
         refinedOriginals.clear()
