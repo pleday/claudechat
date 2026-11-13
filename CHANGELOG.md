@@ -1,8 +1,9 @@
 # Changelog
 
-## Non publié
+## 0.8.3
 
 - **Collage d'images** : Ctrl+V / Maj+Inser et le glisser-déposer passent maintenant par un `TransferHandler` et un raccourci dédiés (le collage ne passait pas par `paste()` dans l'IDE) ; les fichiers copiés depuis un gestionnaire de fichiers sont aussi joints. Du texte copié avec une image (tableur, page web) reste collé comme texte
+- Ctrl+V / Maj+Inser sont interceptés au niveau de la file d'événements de l'IDE quand le champ de saisie a le focus : l'IDE les traitait avant le composant, d'où le collage d'image qui ne faisait rien
 - Collage d'image sous Wayland : si `imageFlavor` n'est pas fourni, l'image est lue depuis les formats `image/png`, `image/jpeg`… du presse-papiers ; les formats disponibles sont journalisés (« Collage (…) : formats du presse-papiers ») pour le diagnostic
 - **Aperçu des pièces jointes** : miniatures des images (clic pour agrandir), pastilles pour les fichiers, retrait pièce par pièce (×) au lieu de la simple liste de noms
 
