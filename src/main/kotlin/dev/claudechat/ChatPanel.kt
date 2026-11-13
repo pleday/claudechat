@@ -412,7 +412,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     init {
         val group = DefaultActionGroup().apply {
-            add(action("Recommencer à zéro dans cet onglet (remplace cette conversation ; le « + » du titre ouvre un nouvel onglet)", AllIcons.Actions.Restart) { newSession() })
+            add(action("Recommencer à zéro dans cet onglet", AllIcons.Actions.Restart) { newSession() })
             add(action("Renommer cet onglet", AllIcons.Actions.Edit) { renameTab() })
             add(action("Sessions (reprendre, renommer, archiver, supprimer)", AllIcons.Vcs.History) { showSessions() })
             add(action("Interrompre", AllIcons.Actions.Suspend, { streaming }) { stop() })
