@@ -202,4 +202,17 @@ class QueueToolsTest {
         assertEquals("/etc/hosts", Mentions.resolve("/etc/hosts", "/p", projectOnly = false))
         assertNull(Mentions.resolve("/p2/x", "/p", projectOnly = true), "préfixe de chaîne ≠ sous-dossier")
     }
+
+    @Test fun formatDurationIsReadable() {
+        assertEquals("moins d'une seconde", formatDuration(300))
+        assertEquals("1 s", formatDuration(700))
+        assertEquals("42 s", formatDuration(42_000))
+        assertEquals("1 min", formatDuration(60_000))
+        assertEquals("1 min 23 s", formatDuration(83_000))
+        assertEquals("59 min 59 s", formatDuration(3_599_000))
+        assertEquals("1 h", formatDuration(3_600_000))
+        assertEquals("1 h 05 min", formatDuration(3_900_000))
+        assertEquals("2 h", formatDuration(7_200_000))
+        assertEquals("moins d'une seconde", formatDuration(-5))
+    }
 }

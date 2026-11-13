@@ -224,3 +224,17 @@ fun assistantHeader(colorHex: String, subtitle: String?, gap: Boolean): String =
     (if (gap) "<table cellpadding='0' cellspacing='0'><tr><td height='10'></td></tr></table>" else "") +
         "<table cellpadding='0' cellspacing='0'><tr><td width='4' bgcolor='$colorHex'>&nbsp;</td><td>&nbsp;&nbsp;" +
         speakerLabel("Claude", colorHex, subtitle) + "</td></tr></table>"
+
+/** Durée lisible : « 42 s », « 1 min 23 s », « 2 min », « 1 h 05 min », « 2 h ». */
+fun formatDuration(ms: Long): String {
+    val total = (ms.coerceAtLeast(0) + 500) / 1000     // arrondi à la seconde la plus proche
+    if (total < 1) return "moins d'une seconde"
+    val h = total / 3600
+    val m = total % 3600 / 60
+    val sec = total % 60
+    return when {
+        h > 0 -> if (m == 0L) "$h h" else "$h h %02d min".format(m)
+        m > 0 -> if (sec == 0L) "$m min" else "$m min $sec s"
+        else -> "$sec s"
+    }
+}

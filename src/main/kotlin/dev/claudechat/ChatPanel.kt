@@ -900,6 +900,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             if (interrupted) session.entries.add(Entry(Kind.NOTICE, "Réponse interrompue."))
             else if (until != null) session.entries.add(Entry(Kind.NOTICE, "Quota atteint : la conversation reprendra automatiquement ${settings.state.autoResumeDelayMin} min après le début de la prochaine session."))
             else session.entries.add(Entry(Kind.ERROR, message ?: "Erreur"))
+        } else if (!interrupted) {
+            session.entries.add(Entry(Kind.NOTICE, "Réponse donnée en ${formatDuration(System.currentTimeMillis() - turnStart)}"))
         }
         if (until != null) {
             scheduleResume(until * 1000)

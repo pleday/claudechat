@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **Durée de la réponse** : « Réponse donnée en 1 min 23 s » s'affiche à la fin de chaque réponse ; le statut ne reste plus figé sur « Réponse en cours » une fois terminée
 - **Historique de saisie** : ↑ sur la première ligne du champ rappelle les messages envoyés, ↓ sur la dernière redescend jusqu'au brouillon
 - **Liens vers les images** : les chemins d'images cités dans les réponses (hors blocs de code) s'ouvrent dans l'éditeur s'ils existent
 - **Rendu plus fluide** : le HTML de chaque message est mis en cache, seule la réponse en cours est recalculée ; l'existence des fichiers cités est mise en cache, le rafraîchissement des fichiers modifiés par Claude est regroupé (et ciblé sur le fichier édité), la recherche `@` est débouncée et hors du thread de l'IDE
