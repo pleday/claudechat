@@ -16,6 +16,8 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.3")
         pluginVerifier()
+        // arbre des changements de l'IDE (SimpleChangesBrowser) pour la liste des fichiers modifiés par Claude
+        bundledModule("intellij.platform.vcs.impl")
     }
     implementation("org.commonmark:commonmark:0.22.0")
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.22.0")

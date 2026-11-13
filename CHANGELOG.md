@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **Fichiers modifiés par Claude** : une ligne au-dessus du champ de saisie (et un bouton de la barre d'outils) indique combien de fichiers Claude a modifiés dans la conversation (+lignes ajoutées −retirées) ; un clic ouvre l'arbre des changements de l'IDE, dont chaque fichier s'ouvre dans l'outil de comparaison de l'IDE (état avant Claude contre état actuel, navigation d'un fichier au suivant). Les modifications faites par des commandes (Bash) ne sont pas suivies
 - **Titres de session à jour** : l'onglet prend le titre généré par la CLI quelques secondes après la réponse (au lieu de garder le début du premier message jusqu'au rechargement) ; un titre donné côté CLI (`/rename`, `--name`) est repris dans la liste des sessions, et renommer un onglet renomme aussi la session côté CLI (visible dans `claude --resume`)
 - **Suggestion du message suivant** : après une réponse, la CLI propose ce que vous écrirez probablement ensuite ; une ligne au-dessus du champ de saisie l'affiche, un clic (ou Tab dans le champ vide) l'insère. Désactivable dans les réglages (une petite requête en plus par réponse, environ 10 % de coût)
 - **Mode de permission appliqué tout de suite** : changer le mode (Demander, Modifs auto, Plan…) pendant que Claude travaille prend effet immédiatement, sans attendre le message suivant (sauf « Tout autoriser », que la CLI n'autorise pas en cours de session)

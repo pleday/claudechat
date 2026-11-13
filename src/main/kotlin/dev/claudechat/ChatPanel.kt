@@ -332,6 +332,25 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         add(queueLabel, BorderLayout.CENTER)
         add(ActionLink("vider").apply { addActionListener { queue.clear(); updateQueue() } }, BorderLayout.EAST)
     }
+    // Fichiers modifiés par Claude dans cette conversation (voir ChangeTracker) : ligne au-dessus du champ + fenêtre de la liste
+    private val changeTracker = ChangeTracker({ cwd })
+    @Volatile private var changedFiles: List<ChangedFile> = emptyList()
+    private val changesLabel = JBLabel(AllIcons.Actions.Diff).apply {
+        iconTextGap = JBUI.scale(4)
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        toolTipText = "Voir les fichiers modifiés par Claude et les ouvrir dans la comparaison de l'IDE"
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) { showChangedFiles() }
+        })
+    }
+    private val changesRow = JPanel(BorderLayout()).apply {
+        isVisible = false
+        border = JBUI.Borders.empty(0, 6)
+        add(changesLabel, BorderLayout.CENTER)
+        add(ActionLink("effacer").apply { toolTipText = "Oublier ces modifications"; addActionListener { clearChangedFiles() } }, BorderLayout.EAST)
+    }
+    private val changesTask = Runnable { refreshChangedFiles() }
+
     // Suggestion du message suivant proposée par la CLI (--prompt-suggestions) : un clic, ou Tab dans le champ vide, l'insère
     private var suggestion: String? = null
     private val suggestLabel = JBLabel(AllIcons.Actions.IntentionBulb).apply {
@@ -539,6 +558,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             add(action("Renommer cet onglet", AllIcons.Actions.Edit) { renameTab() })
             add(action("Sessions (reprendre, renommer, archiver, supprimer)", AllIcons.Vcs.History) { showSessions() })
             add(action("Interrompre", AllIcons.Actions.Suspend, { streaming }) { stop() })
+            add(action("Fichiers modifiés par Claude (comparer avec l'état avant)", AllIcons.Actions.Diff, { changedFiles.isNotEmpty() }) { showChangedFiles() })
             add(action("Rechercher dans la conversation", AllIcons.Actions.Find) { searchInChat() })
             add(action("Dupliquer la conversation (fork au prochain message)", AllIcons.Actions.Copy, { session.id != null && !streaming }) {
                 forkNext = true
@@ -567,7 +587,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val topRows = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
-            add(extrasRow); add(queueRow); add(suggestRow)
+            add(extrasRow); add(queueRow); add(changesRow); add(suggestRow)
         }
         val bottom = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(2, 6, 6, 6)
@@ -635,7 +655,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun newSession() {
         if (!confirmDiscard("Démarrer une nouvelle conversation interrompt la réponse en cours (la conversation actuelle reste dans l'historique des sessions).", "Interrompre et recommencer")) return
         abandonTurn()
-        suggestion = null; cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
+        suggestion = null; clearChangedFiles(); cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
         render(forceBottom = true)
         input.requestFocusInWindow()
     }
@@ -643,7 +663,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     fun loadSession(s: Session) {
         if (!confirmDiscard("Charger une autre session interrompt la réponse en cours.", "Interrompre et charger")) return
         abandonTurn()
-        suggestion = null; cancelResume(); session = s; customTitle = null; allowAll = false; applyRemote(settings.state.remoteDefault)
+        suggestion = null; clearChangedFiles(); cancelResume(); session = s; customTitle = null; allowAll = false; applyRemote(settings.state.remoteDefault)
         resetUsage()
         render(forceBottom = true)
     }
@@ -856,7 +876,12 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         override fun onText(delta: String) = ui(gen) { append(Kind.TEXT, delta) }
         override fun onThinking(delta: String) = ui(gen) { append(Kind.THINKING, delta) }
-        override fun onToolUse(id: String, name: String, input: JsonObject) = ui(gen) {
+        override fun onToolUse(id: String, name: String, input: JsonObject) {
+            // état du fichier avant que l'outil s'exécute : lu tout de suite, sans attendre le passage sur l'EDT
+            changeTracker.beforeEdit(name, input)
+            onToolUseUi(gen, id, name, input)
+        }
+        private fun onToolUseUi(gen: Int, id: String, name: String, input: JsonObject) = ui(gen) {
             openKind = null
             if (session.entries.none { it.toolId == id }) session.entries.add(Entry(Kind.TOOL, toolId = id, toolName = name, input = input, model = activeModel))
             scheduleRender()
@@ -864,7 +889,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onToolResult(id: String, text: String, isError: Boolean) = ui(gen) {
             val e = session.entries.firstOrNull { it.toolId == id }
             e?.result = text; e?.isError = isError
-            if (e?.toolName?.let { it in WRITE_TOOLS } == true) { renderer.linker.invalidate(); scheduleRefresh(e) }
+            if (e?.toolName?.let { it in WRITE_TOOLS } == true) { renderer.linker.invalidate(); scheduleRefresh(e); scheduleChangedFilesRefresh() }
             scheduleRender()
         }
         override fun onPermission(req: PermissionRequest) = ui(gen) {
@@ -907,6 +932,34 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         updateStatus()
         alarm.addRequest({ pollResume() }, 30_000)
+    }
+
+    // ---------- Fichiers modifiés par Claude ----------
+
+    private fun scheduleChangedFilesRefresh() { alarm.cancelRequest(changesTask); alarm.addRequest(changesTask, 300) }
+
+    /** Relit l'état des fichiers suivis (hors EDT : accès disque et calcul des différences) puis met la ligne à jour. */
+    private fun refreshChangedFiles() {
+        if (changeTracker.isEmpty) { changedFiles = emptyList(); updateChangesRow(); return }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val list = changeTracker.changes()
+            ApplicationManager.getApplication().invokeLater({ changedFiles = list; updateChangesRow() }, ModalityState.any())
+        }
+    }
+
+    private fun updateChangesRow() {
+        val files = changedFiles
+        changesRow.isVisible = files.isNotEmpty()
+        changesLabel.text = if (files.isEmpty()) "" else ChangedFilesView.summary(files) + " — voir"
+        changesRow.revalidate(); changesRow.repaint()
+    }
+
+    private fun clearChangedFiles() { changeTracker.clear(); changedFiles = emptyList(); updateChangesRow() }
+
+    private fun showChangedFiles() {
+        val files = changedFiles
+        if (files.isEmpty()) return
+        ChangedFilesView.show(project, files) { clearChangedFiles() }
     }
 
     /** Titre de la conversation proposé par la CLI, sauf si l'utilisateur a renommé l'onglet lui-même. */
@@ -1108,6 +1161,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             scheduleResume(until * 1000)
             if (remoteOn) RemoteBridge.notifyPhone("⏸ [${project.name}] Quota atteint, reprise automatique prévue.")
         }
+        scheduleChangedFilesRefresh()
         if (!isError && !interrupted) scheduleTitleRefresh()
         if (settings.state.notify && !interrupted) Notifier.info(project, "Claude a terminé : ${session.title}")
         if (remoteOn && !interrupted && !isError) {
