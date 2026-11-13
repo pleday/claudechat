@@ -79,4 +79,35 @@ class SessionStoreTest {
             """{"type":"user","message":{"content":"<command-name>/clear</command-name>"}}""", user)
         assertEquals(1, SessionStore.load(SessionStore.list(cwd).single()).entries.size)
     }
+
+    @Test fun titleIsRecomputedOnlyWhenTheFileChanges() {
+        write("a", user, ageSec = 100)
+        assertEquals("Bonjour Claude", SessionStore.list(cwd).single().title)
+        // même date de modification : le titre vient du cache même si le contenu a changé
+        val f = SessionStore.projectDir(cwd).resolve("a.jsonl")
+        val mtime = Files.getLastModifiedTime(f)
+        Files.writeString(f, """{"type":"user","message":{"role":"user","content":"Autre"}}""")
+        Files.setLastModifiedTime(f, mtime)
+        assertEquals("Bonjour Claude", SessionStore.list(cwd).single().title)
+        Files.setLastModifiedTime(f, java.nio.file.attribute.FileTime.fromMillis(mtime.toMillis() + 5000))
+        assertEquals("Autre", SessionStore.list(cwd).single().title)
+    }
+
+    @Test fun incompleteMetaFileIsTolerated() {
+        write("a", user)
+        Files.writeString(DataHome.dir.resolve("session-meta.json"), """{"titles":{"a":"Mon titre"}}""")
+        assertEquals("Mon titre", SessionStore.list(cwd).single().title)
+        SessionStore.setArchived("a", true)
+        assertTrue(SessionStore.list(cwd).isEmpty())
+        assertEquals("Mon titre", SessionStore.list(cwd, includeArchived = true).single().title)
+    }
+
+    @Test fun corruptMetaFileIsIgnoredAndMetaSaveLeavesNoTempFile() {
+        write("a", user)
+        Files.writeString(DataHome.dir.resolve("session-meta.json"), "{pas du json")
+        assertEquals("Bonjour Claude", SessionStore.list(cwd).single().title)
+        SessionStore.rename("a", "Neuf")
+        assertEquals("Neuf", SessionStore.list(cwd).single().title)
+        assertFalse(Files.exists(DataHome.dir.resolve("session-meta.json.tmp")))
+    }
 }

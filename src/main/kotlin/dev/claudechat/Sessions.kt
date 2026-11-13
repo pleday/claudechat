@@ -53,10 +53,31 @@ object SessionStore {
         val archived: MutableSet<String> = mutableSetOf(),
     )
 
-    private fun meta(): Meta =
-        runCatching { gson.fromJson(Files.readString(metaFile), Meta::class.java) }.getOrNull() ?: Meta()
+    /** Lecture tolérante : un champ absent ou null (fichier ancien ou tronqué) ne doit pas faire planter. */
+    private fun meta(): Meta {
+        val o = runCatching { JsonParser.parseString(Files.readString(metaFile)).asJsonObject }.getOrNull() ?: return Meta()
+        val titles = (o["titles"] as? JsonObject)?.entrySet()
+            ?.mapNotNull { (k, v) -> v.takeIf { it.isJsonPrimitive }?.asString?.let { k to it } }.orEmpty()
+        val archived = (o["archived"] as? com.google.gson.JsonArray)?.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString }.orEmpty()
+        return Meta(titles.toMap(mutableMapOf()), archived.toMutableSet())
+    }
 
-    private fun saveMeta(m: Meta) = Files.writeString(metaFile, gson.toJson(m))
+    /** Écriture atomique (fichier temporaire puis renommage) : un arrêt ou un second IDE ne laisse jamais un JSON tronqué. */
+    private fun saveMeta(m: Meta) {
+        val tmp = metaFile.resolveSibling(metaFile.fileName.toString() + ".tmp")
+        Files.writeString(tmp, gson.toJson(m))
+        try { Files.move(tmp, metaFile, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+        catch (_: java.nio.file.AtomicMoveNotSupportedException) { Files.move(tmp, metaFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+    }
+
+    /** Titres déjà calculés, valables tant que la date de modification du fichier ne change pas. */
+    private val titleCache = java.util.concurrent.ConcurrentHashMap<Path, Pair<Long, String>>()
+
+    private fun cachedTitle(f: Path, mtime: Long): String {
+        titleCache[f]?.takeIf { it.first == mtime }?.let { return it.second }
+        if (titleCache.size > 500) titleCache.clear()
+        return scanTitle(f).also { titleCache[f] = mtime to it }
+    }
 
     /** Dossier de données de la CLI (surchargeable pour les tests). */
     var claudeDir: Path = Path.of(System.getProperty("user.home"), ".claude")
@@ -68,19 +89,17 @@ object SessionStore {
         val dir = projectDir(cwd)
         if (!Files.isDirectory(dir)) return emptyList()
         val m = meta()
+        // une seule lecture de la date par fichier (le tri la rappelait à chaque comparaison)
         val files = Files.list(dir).use { st ->
             st.filter { it.toString().endsWith(".jsonl") }.toList()
-        }.sortedByDescending { Files.getLastModifiedTime(it).toMillis() }
+        }.map { it to runCatching { Files.getLastModifiedTime(it).toMillis() }.getOrDefault(0L) }
+            .sortedByDescending { it.second }
         return files.asSequence()
-            .map { f ->
-                val id = f.fileName.toString().removeSuffix(".jsonl")
-                Triple(f, id, id in m.archived)
-            }
-            .filter { includeArchived || !it.third }
+            .map { (f, mtime) -> Triple(f, mtime, f.fileName.toString().removeSuffix(".jsonl")) }
+            .filter { includeArchived || it.third !in m.archived }
             .drop(offset).take(limit)
-            .map { (f, id, arch) ->
-                SessionInfo(id, m.titles[id] ?: scanTitle(f), Files.getLastModifiedTime(f).toMillis(), arch, f)
-            }.toList()
+            .map { (f, mtime, id) -> SessionInfo(id, m.titles[id] ?: cachedTitle(f, mtime), mtime, id in m.archived, f) }
+            .toList()
     }
 
     private fun scanTitle(f: Path): String {
@@ -157,16 +176,17 @@ object SessionStore {
         else -> c.toString()
     }
 
-    fun rename(id: String, title: String) { val m = meta(); m.titles[id] = title; saveMeta(m) }
+    @Synchronized fun rename(id: String, title: String) { val m = meta(); m.titles[id] = title; saveMeta(m) }
 
-    fun setArchived(id: String, archived: Boolean) {
+    @Synchronized fun setArchived(id: String, archived: Boolean) {
         val m = meta()
         if (archived) m.archived.add(id) else m.archived.remove(id)
         saveMeta(m)
     }
 
-    fun delete(info: SessionInfo) {
+    @Synchronized fun delete(info: SessionInfo) {
         Files.deleteIfExists(info.file)
+        titleCache.remove(info.file)
         val m = meta(); m.titles.remove(info.id); m.archived.remove(info.id); saveMeta(m)
     }
 }
