@@ -771,7 +771,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var hourglassFrame = 0
 
     private fun tick() {
-        if (!streaming) return
+        // dernier passage après la fin : sans ce rafraîchissement, « Réponse en cours » resterait affiché, sablier figé
+        if (!streaming) { updateStatus(); return }
         updateStatus()
         hourglassFrame++
         alarm.addRequest({ tick() }, 500)
@@ -887,6 +888,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         streaming = false
         idleTurn = turn // process gardé ouvert un moment : la CLI peut reprendre (tâche de fond), voir onResumed
         turn = null
+        updateStatus()
         clearInteractions("Réponse terminée", deny = false)
         refinedOriginals.clear()
         val until = if (isError && !interrupted && autoResumeOn && resumeAttempts < MAX_RESUMES)
@@ -924,7 +926,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     private fun abandonTurn() {
-        if (streaming) { generation++; turn?.kill(); turn = null; streaming = false; clearInteractions("Conversation fermée", deny = false) }
+        if (streaming) { generation++; turn?.kill(); turn = null; streaming = false; clearInteractions("Conversation fermée", deny = false); updateStatus() }
     }
 
     // ---------- Permissions, plans, questions ----------
