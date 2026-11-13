@@ -86,6 +86,8 @@ interface TurnListener {
     fun onDone(isError: Boolean, message: String?) {}
     /** La CLI a repris du travail après un `result` (tâche de fond, message empilé…) : le tour est de nouveau en cours. */
     fun onResumed() {}
+    /** La CLI a changé le titre de la session (renommage, titre généré). */
+    fun onTitle(title: String) {}
     /** Message que l'utilisateur écrira probablement ensuite, proposé par la CLI après la réponse. */
     fun onSuggestion(text: String) {}
     /** Serveurs MCP non connectés (« nom (statut) ») à l'envoi du message : leurs outils sont indisponibles pour ce tour. */
@@ -177,8 +179,10 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                     l.onResumed()
                 }
                 when (j["type"]?.asString) {
-                    "system" -> if (j["subtype"]?.asString == "init")
-                        l.onInit(j["session_id"].asString, j["model"]?.asString)
+                    "system" -> when (j["subtype"]?.asString) {
+                        "init" -> l.onInit(j["session_id"].asString, j["model"]?.asString)
+                        "session_title_changed" -> j["title"]?.takeIf { it.isJsonPrimitive }?.asString?.takeIf { it.isNotBlank() }?.let(l::onTitle)
+                    }
                     "stream_event" -> stream(j["event"].asJsonObject)
                     "assistant" -> j["message"]?.asJsonObject?.get("content")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { b ->
                         val bo = b.asJsonObject

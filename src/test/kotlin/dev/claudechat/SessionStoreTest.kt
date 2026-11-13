@@ -110,4 +110,38 @@ class SessionStoreTest {
         assertEquals("Neuf", SessionStore.list(cwd).single().title)
         assertFalse(Files.exists(DataHome.dir.resolve("session-meta.json.tmp")))
     }
+
+    @Test fun cliCustomTitleBeatsAiTitleAndFirstMessage() {
+        write("a", user, """{"type":"ai-title","aiTitle":"Titre IA"}""", """{"type":"custom-title","customTitle":"Renommée dans le terminal","sessionId":"a"}""")
+        assertEquals("Renommée dans le terminal", SessionStore.list(cwd).single().title)
+    }
+
+    @Test fun pluginTitleStillBeatsCliTitles() {
+        write("a", user, """{"type":"custom-title","customTitle":"Titre CLI","sessionId":"a"}""")
+        SessionStore.rename("a", "Titre du plugin")
+        assertEquals("Titre du plugin", SessionStore.list(cwd).single().title)
+    }
+
+    @Test fun liveTitleReadsTheLatestTitleFromTheEndOfTheFile() {
+        write("a", user, """{"type":"ai-title","aiTitle":"Premier titre"}""", asst, """{"type":"ai-title","aiTitle":"Titre à jour"}""")
+        assertEquals("Titre à jour", SessionStore.liveTitle(cwd, "a"))
+        assertNull(SessionStore.liveTitle(cwd, "inconnue"))
+        write("b", user, asst)
+        assertNull(SessionStore.liveTitle(cwd, "b"), "pas de titre généré pour l'instant")
+    }
+
+    @Test fun liveTitleOnlyLooksAtTheTailOfLongFiles() {
+        val filler = "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"${"x".repeat(2000)}\"}]}}"
+        // titre dans la fin : trouvé malgré un fichier bien plus long que la fenêtre de lecture
+        write("a", user, *Array(400) { filler }, """{"type":"ai-title","aiTitle":"Titre récent"}""")
+        assertEquals("Titre récent", SessionStore.liveTitle(cwd, "a", tailBytes = 64 * 1024))
+        // titre seulement au début : hors de la fenêtre, la lecture partielle ne le voit pas (et ne plante pas)
+        write("b", user, """{"type":"ai-title","aiTitle":"Titre ancien"}""", *Array(400) { filler })
+        assertNull(SessionStore.liveTitle(cwd, "b", tailBytes = 64 * 1024))
+    }
+
+    @Test fun liveTitleIgnoresATruncatedLastLine() {
+        write("a", user, """{"type":"ai-title","aiTitle":"Complet"}""", """{"type":"ai-title","aiTitle":"Tronq""")
+        assertEquals("Complet", SessionStore.liveTitle(cwd, "a"))
+    }
 }

@@ -126,4 +126,21 @@ echo '{"type":"result","is_error":false}'""")
         assertNull(CliTurn.cleanSuggestion(null))
         assertEquals(300, CliTurn.cleanSuggestion("x".repeat(500))!!.length)
     }
+
+    @Test fun titleChangedEventReachesTheListener() {
+        val cli = fake("""read -r first
+echo '{"type":"system","subtype":"session_title_changed","title":"Analyse du projet","session_id":"s1"}'
+echo '{"type":"system","subtype":"session_title_changed","title":"  ","session_id":"s1"}'
+echo '{"type":"system","subtype":"status","status":"requesting"}'
+sleep 3""")
+        val got = java.util.concurrent.LinkedBlockingQueue<String>()
+        val content = JsonArray().apply { add(JsonObject().apply { addProperty("type", "text"); addProperty("text", "x") }) }
+        val t = CliTurn(TurnOptions(cli, tmp.toString(), "", "auto", "manual", null, "", emptyList()), content,
+            object : TurnListener { override fun onTitle(title: String) { got.add(title) } })
+        t.start()
+        try {
+            assertEquals("Analyse du projet", got.poll(10, TimeUnit.SECONDS))
+            assertNull(got.poll(500, TimeUnit.MILLISECONDS), "titre vide et autres événements système ignorés")
+        } finally { t.kill() }
+    }
 }

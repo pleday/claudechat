@@ -102,22 +102,56 @@ object SessionStore {
             .toList()
     }
 
-    private fun scanTitle(f: Path): String {
+    /**
+     * Titre écrit par la CLI dans la session : « custom-title » (renommage, `--name`, `/rename`) avant « ai-title » (titre
+     * généré). Une ligne illisible (écriture en cours, tronquée) est ignorée.
+     */
+    private class TitleScan {
+        var custom: String? = null
         var ai: String? = null
+        fun feed(line: String) {
+            val isCustom = line.contains("\"custom-title\"")
+            if (!isCustom && !line.contains("\"ai-title\"")) return
+            val o = runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: return
+            if (isCustom && o["type"]?.asString == "custom-title") o["customTitle"]?.takeIf { it.isJsonPrimitive }?.asString?.takeIf { it.isNotBlank() }?.let { custom = it }
+            else if (o["type"]?.asString == "ai-title") o["aiTitle"]?.takeIf { it.isJsonPrimitive }?.asString?.takeIf { it.isNotBlank() }?.let { ai = it }
+        }
+        val title: String? get() = custom ?: ai
+    }
+
+    private fun scanTitle(f: Path): String {
+        val scan = TitleScan()
         var first: String? = null
         runCatching {
             Files.newBufferedReader(f).useLines { lines ->
                 for (l in lines) {
-                    if (l.contains("\"ai-title\"")) {
-                        ai = runCatching { JsonParser.parseString(l).asJsonObject["aiTitle"].asString }.getOrNull() ?: ai
-                    } else if (first == null && l.startsWith("{") && l.contains("\"type\":\"user\"")) {
-                        first = userText(JsonParser.parseString(l).asJsonObject)?.lineSequence()?.firstOrNull { it.isNotBlank() }?.take(60)
+                    scan.feed(l)
+                    if (first == null && l.startsWith("{") && l.contains("\"type\":\"user\"")) {
+                        first = runCatching { userText(JsonParser.parseString(l).asJsonObject)?.lineSequence()?.firstOrNull { it.isNotBlank() }?.take(60) }.getOrNull()
                     }
                 }
             }
         }
-        return ai ?: first ?: "Conversation"
+        return scan.title ?: first ?: "Conversation"
     }
+
+    /**
+     * Titre actuel d'une session ouverte, lu dans la fin de son fichier seulement (la CLI réécrit son titre au fil de la
+     * conversation) : bon marché même pour une longue session. null si la fin du fichier n'en contient pas.
+     */
+    fun liveTitle(cwd: String, id: String, tailBytes: Long = 256 * 1024): String? = runCatching {
+        val f = projectDir(cwd).resolve("$id.jsonl")
+        java.io.RandomAccessFile(f.toFile(), "r").use { raf ->
+            val start = (raf.length() - tailBytes).coerceAtLeast(0)
+            raf.seek(start)
+            val bytes = ByteArray((raf.length() - start).toInt()).also { raf.readFully(it) }
+            val scan = TitleScan()
+            val lines = String(bytes, Charsets.UTF_8).lines()
+            // si on a commencé au milieu du fichier, la première ligne est tronquée
+            (if (start > 0) lines.drop(1) else lines).forEach(scan::feed)
+            scan.title
+        }
+    }.getOrNull()
 
     private fun userText(o: JsonObject): String? {
         if (o["isMeta"]?.asBoolean == true) return null

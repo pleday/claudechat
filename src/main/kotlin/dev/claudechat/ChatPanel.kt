@@ -843,6 +843,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onLiveUsage(contextTokens: Int, outputTokens: Int) = ui(gen) { liveCtx = contextTokens; liveOut = outputTokens; updateStatus() }
         override fun onRateLimits(limits: RateLimits) = ui(gen) { lastLimits = limits; applyLimits(limits) }
         override fun onSuggestion(text: String) = ui(gen) { setSuggestion(text) }
+        override fun onTitle(title: String) = ui(gen) { applyCliTitle(title) }
         override fun onContextWindow(model: String, tokens: Int) = ui(gen) { contextWindows[model] = tokens; updateRing() }
         override fun onRefineLost(texts: List<String>) = ui(gen) {
             texts.forEach { body ->
@@ -906,6 +907,38 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         updateStatus()
         alarm.addRequest({ pollResume() }, 30_000)
+    }
+
+    /** Titre de la conversation proposé par la CLI, sauf si l'utilisateur a renommé l'onglet lui-même. */
+    private fun applyCliTitle(title: String) {
+        if (customTitle != null || title.isBlank() || title == session.title) return
+        session.title = title
+        render()
+    }
+
+    private val titleTask = Runnable { refreshCliTitle() }
+    private var titleChecks = 0
+
+    /**
+     * La CLI génère le titre de la session après la réponse, en l'écrivant dans le fichier de session : on le relit
+     * quelques fois (2,5 s, 7,5 s, 12,5 s après la fin) pour que l'onglet ne garde pas le début du premier message.
+     */
+    private fun scheduleTitleRefresh() {
+        if (customTitle != null || session.id == null) return
+        titleChecks = 0
+        alarm.cancelRequest(titleTask); alarm.addRequest(titleTask, 2_500)
+    }
+
+    private fun refreshCliTitle() {
+        val sid = session.id ?: return
+        if (customTitle != null) return
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val t = SessionStore.liveTitle(cwd, sid)
+            ApplicationManager.getApplication().invokeLater({
+                if (session.id == sid && t != null) applyCliTitle(t)
+                if (session.id == sid && ++titleChecks < 3) alarm.addRequest(titleTask, 5_000)
+            }, ModalityState.any())
+        }
     }
 
     private fun cancelResume() { resumeAt = 0; resumeAttempts = 0; updateStatus() }
@@ -1075,6 +1108,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             scheduleResume(until * 1000)
             if (remoteOn) RemoteBridge.notifyPhone("⏸ [${project.name}] Quota atteint, reprise automatique prévue.")
         }
+        if (!isError && !interrupted) scheduleTitleRefresh()
         if (settings.state.notify && !interrupted) Notifier.info(project, "Claude a terminé : ${session.title}")
         if (remoteOn && !interrupted && !isError) {
             val answer = finalAnswer().ifEmpty { "(aucune réponse textuelle)" }
@@ -1836,6 +1870,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         if (t.isEmpty()) return
         customTitle = t
         session.id?.let { runCatching { SessionStore.rename(it, t) } }
+        // le processus de la conversation (s'il tourne) écrit aussi le titre : `claude --resume` affichera le même nom
+        (turn ?: idleTurn)?.let { live -> ApplicationManager.getApplication().executeOnPooledThread { live.renameSession(t) } }
         render()
     }
 
