@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+
+- **Message épinglé** : une fois déplié, sa première ligne n'apparaît plus deux fois (le libellé affiche « Votre message », le texte complet est en dessous)
+- **Constantes et prompts communs** avec l'extension VS Code (modes de permission, prompts `/explain`, `/fix`…, seuils) lus depuis une source unique, et vecteurs de test partagés entre les deux projets ; le délai de péremption de la mesure des quotas reste de 30 min
+
 ## 0.9.0
 
 - **Haut de la zone de saisie plus compact** : les fichiers modifiés par Claude et la suggestion du message suivant tiennent sur une seule rangée de pastilles alignées à gauche (même style que les pièces jointes), au lieu de deux lignes centrées empilées ; chaque pastille a sa croix (oublier les modifications, ignorer la suggestion)
