@@ -708,7 +708,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         override fun onToolResult(id: String, text: String, isError: Boolean) = ui(gen) {
             val e = session.entries.firstOrNull { it.toolId == id }
             e?.result = text; e?.isError = isError
-            if (e?.toolName?.let { it in WRITE_TOOLS } == true) refreshFiles()
+            if (e?.toolName?.let { it in WRITE_TOOLS } == true) { linker.invalidate(); refreshFiles() }
             scheduleRender()
         }
         override fun onPermission(req: PermissionRequest) = ui(gen) {
@@ -1578,16 +1578,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         OpenFileDescriptor(project, vf, line.coerceAtLeast(0), 0).navigate(true)
     }
 
-    private val pathRegex = Regex("""<code>([\w@./\\-]+\.[A-Za-z0-9]+)(?::(\d+))?</code>""")
-
-    private fun linkify(html: String): String = pathRegex.replace(html) { m ->
-        val p = m.groupValues[1]
-        val abs = if (p.startsWith("/")) p else "$cwd/$p"
-        if (Files.isRegularFile(Path.of(abs))) {
-            val spec = p + (m.groupValues[2].takeIf { it.isNotEmpty() }?.let { ":$it" } ?: "")
-            "<a href=\"open:$spec\"><code>${m.groupValues[1]}${m.groupValues[2].takeIf { it.isNotEmpty() }?.let { ":$it" } ?: ""}</code></a>"
-        } else m.value
-    }
+    private val linker = Linkify({ cwd })
 
     // ---------- Rendu ----------
 
@@ -1664,7 +1655,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                     }
                     when (e.kind) {
                         Kind.TEXT -> {
-                            sb.append(linkify(Md.toHtml(e.text, codeTexts)))
+                            sb.append(linker.images(linker.files(Md.toHtml(e.text, codeTexts))))
                             if (responseTexts.isNotEmpty()) responseTexts[responseTexts.lastIndex] = (responseTexts.last() + "\n\n" + e.text).trim()
                         }
                         Kind.THINKING -> if (showThinking) sb.append("<blockquote><font color='gray'><i>${esc(e.text).replace("\n", "<br/>")}</i></font></blockquote>")
@@ -1690,7 +1681,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val label = if (path != null) {
             val rel = path.removePrefix("$cwd/")
             "<a href=\"open:${esc(path)}\">${esc(rel)}</a>"
-        } else "<code>${esc(summary.take(200))}</code>"
+        } else linker.images("<code>${esc(summary.take(200))}</code>", inCode = true)
         val res = e.result?.takeIf { it.isNotBlank() && showTools }?.let {
             "<br/><font color='${if (e.isError) "red" else "gray"}' size='-1'>${esc(it.take(500)).replace("\n", "<br/>")}</font>"
         } ?: ""
