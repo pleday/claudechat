@@ -1161,14 +1161,19 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val all = dirtyAll
         val paths = dirtyPaths.toList()
         dirtyAll = false; dirtyPaths.clear()
-        if (all) {
-            val root = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) } ?: return
-            VfsUtil.markDirtyAndRefresh(true, true, true, root)
-        } else if (paths.isNotEmpty()) {
+        if (!all && paths.isEmpty()) return
+        val base = project.basePath
+        // hors EDT : refreshAndFindFileByPath y est refusé par les IDE récents (exception « write-intent lock »)
+        ApplicationManager.getApplication().executeOnPooledThread {
             val fs = LocalFileSystem.getInstance()
-            // le fichier peut être nouveau : on rafraîchit aussi son dossier parent
-            val files = paths.mapNotNull { fs.refreshAndFindFileByPath(it) }
-            if (files.isNotEmpty()) VfsUtil.markDirtyAndRefresh(true, false, false, *files.toTypedArray())
+            if (all) {
+                val root = base?.let { fs.findFileByPath(it) } ?: return@executeOnPooledThread
+                VfsUtil.markDirtyAndRefresh(true, true, true, root)
+            } else {
+                // le fichier peut être nouveau : refreshAndFind le découvre
+                val files = paths.mapNotNull { fs.refreshAndFindFileByPath(it) }
+                if (files.isNotEmpty()) VfsUtil.markDirtyAndRefresh(true, false, false, *files.toTypedArray())
+            }
         }
     }
 
