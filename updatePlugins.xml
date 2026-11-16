@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.4/claude-chat-0.9.4.zip" version="0.9.4">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.5/claude-chat-0.9.5.zip" version="0.9.5">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Arrêt de la CLI</b> : quand le processus <code>claude</code> s'arrête sans résultat, le message d'erreur de la CLI (stderr) est maintenant toujours affiché, au lieu d'un message générique si sa lecture n'était pas terminée</li>
+<li><b>Fichiers modifiés par Claude</b> : moins de bruit. Les fichiers écrits dans un dossier temporaire (<code>/tmp</code>, scratchpad de Claude), dans <code>.claude/worktrees</code> ou dans un dossier généré (<code>build</code>, <code>node_modules</code>…) ne sont plus listés, et les worktrees ne sont plus parcourus par la détection des changements faits par les commandes</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
