@@ -103,26 +103,37 @@ input:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 .chip .x:hover { opacity: 1; }
 .thumb { height: 18px; border-radius: 3px; }
 
-#statusrow { display: flex; align-items: center; gap: 6px; font-size: .88em; color: var(--vscode-descriptionForeground); min-height: 1.3em; }
+#statusrow { display: flex; align-items: center; gap: 6px; padding: 0 2px; font-size: .88em; color: var(--vscode-descriptionForeground); min-height: 1.3em; }
 #status { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#hourglass { animation: spin 2s linear infinite; display: inline-block; }
+#hourglass { display: inline-flex; color: var(--accent); }
+#hourglass svg { animation: spin 1.2s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-#card { position: relative; border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #8886)); border-radius: 8px; background: var(--vscode-input-background); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
-#card:focus-within { border-color: var(--accent); }
+#card { position: relative; border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #8886)); border-radius: 10px; background: var(--vscode-input-background); padding: 8px 8px 6px; display: flex; flex-direction: column; gap: 6px; transition: border-color .15s, box-shadow .15s; }
+#card:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 #input { resize: none; border: none; background: transparent; padding: 2px 4px; width: 100%; }
 #grip { position: absolute; top: -3px; left: 0; right: 0; height: 8px; cursor: ns-resize; z-index: 2; }
 #grip::after { content: ''; position: absolute; left: 50%; top: 3px; width: 28px; height: 2px; margin-left: -14px; border-radius: 1px; background: var(--vscode-descriptionForeground); opacity: 0; transition: opacity .15s; }
 #grip:hover::after, #grip.drag::after { opacity: .6; }
 #input:focus { outline: none; }
-#controls { display: flex; align-items: center; gap: 2px; min-width: 0; }
+#controls { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .grow { flex: 1 1 0; min-width: 2px; }
-.fb { flex: 0 1 auto; min-width: 0; background: none; border: none; border-radius: 4px; padding: 1px 6px; font-size: .9em; color: var(--vscode-descriptionForeground); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 4px; height: 24px; background: none; border: none; border-radius: 6px; padding: 0 8px; font-size: .92em; color: var(--vscode-descriptionForeground); max-width: 170px; white-space: nowrap; }
+.fb .lbl { overflow: hidden; text-overflow: ellipsis; }
+.fb .ico { display: inline-flex; flex: none; }
+.fb .ico svg { width: 14px; height: 14px; }
+.fb .chev { opacity: .7; }
+.fb .chev svg { width: 10px; height: 10px; }
+#plus { width: 24px; padding: 0; justify-content: center; }
+#plus svg { width: 15px; height: 15px; }
+#battery { gap: 5px; }
 .fb:hover { background: var(--vscode-toolbar-hoverBackground); color: var(--vscode-foreground); }
 .fb.off { opacity: .55; }
 .fb.low { color: var(--vscode-errorForeground); }
-.round { flex: none; border: none; border-radius: 50%; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--vscode-button-secondaryBackground); }
+.round { flex: none; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--vscode-button-secondaryForeground, inherit); background: var(--vscode-button-secondaryBackground); transition: filter .12s; }
+.round:hover:not(:disabled) { filter: brightness(1.15); }
 .round.send { background: var(--accent); color: #fff; }
+#busyMenu { width: 22px; height: 28px; border-radius: 6px; }
 .round.send:disabled { opacity: .4; cursor: default; }
 .round.stop { background: var(--vscode-errorForeground); color: #fff; }
 button[hidden], [hidden] { display: none !important; }

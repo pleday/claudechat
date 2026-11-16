@@ -176,7 +176,7 @@ describe('interface du webview', () => {
     host({ t: 'state', patch: { streaming: true, statusText: 'Réponse en cours', queue: ['un', 'deux'] } });
     expect($('stop').hidden).toBe(false);
     expect($('busyMenu').hidden).toBe(false);
-    expect($('send').textContent).toBe('⚡');
+    expect($('send').innerHTML).toContain('M9 1.8L3.6 9'); // « préciser » : éclair
     expect($('queue').textContent).toContain('+1 autre');
     $('stop').click();
     $('queue').querySelector('a')!.click();

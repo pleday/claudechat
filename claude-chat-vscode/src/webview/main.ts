@@ -1,4 +1,5 @@
 import { contextPercent, fmtTokens, type ContextUsage } from '../core/cliInfo';
+import { ICONS } from '../icons';
 import { InputHistory } from '../core/inputHistory';
 import type { Entry } from '../core/sessions';
 import { SlashCatalog, Tips } from '../core/slashCatalog';
@@ -259,14 +260,18 @@ function showUsage(r: UsageReport): void {
 
 const modeLabel = () => PERMISSION_MODES.find((m) => m[0] === state.mode)?.[1] ?? state.mode;
 
+/** Contenu SVG statique (jamais de texte de l'utilisateur) : sûr en innerHTML. */
+const icon = (svg: string, cls = 'ico'): HTMLElement => { const s = el('span', cls); s.innerHTML = svg; return s; };
+const withChevron = (b: HTMLElement, text: string): void => b.replaceChildren(el('span', 'lbl', text), icon(ICONS.chevron, 'ico chev'));
+
 function drawControls(): void {
-  $('modeBtn').textContent = `${modeLabel()} ▾`;
-  $('modelBtn').textContent = `${modelLabel(state.model)} ▾`;
+  withChevron($('modeBtn'), modeLabel());
+  withChevron($('modelBtn'), modelLabel(state.model));
   const eff = $('effortBtn');
-  eff.textContent = `${state.effort} ▾`;
+  withChevron(eff, state.effort);
   eff.hidden = state.efforts.length <= 1;
   const ctxBtn = $('ctxBtn');
-  ctxBtn.replaceChildren(el('span', undefined, '📄'), el('span', 'lbl', ` ${state.contextOn ? state.contextFile || 'fichier courant' : 'sans contexte'}`));
+  ctxBtn.replaceChildren(icon(ICONS.file), el('span', 'lbl', `${state.contextOn ? state.contextFile || 'fichier courant' : 'sans contexte'}`));
   ctxBtn.classList.toggle('off', !state.contextOn || !state.contextFile);
   ctxBtn.title = state.contextOn ? 'Le fichier ouvert (ou la sélection) est joint au message — cliquer pour désactiver' : 'Contexte de l\'éditeur désactivé — cliquer pour activer';
   $('remoteBtn').classList.toggle('on', state.remoteOn);
@@ -301,7 +306,7 @@ function drawBattery(): void {
   const b = $('battery');
   const r = state.battery.remaining;
   b.title = state.battery.tip;
-  b.textContent = r === null ? '🔋 ?' : `${r < 20 ? '🪫' : '🔋'} ${r} %`;
+  b.replaceChildren(icon(r !== null && r < 20 ? ICONS.batteryLow : ICONS.battery), el('span', 'lbl', r === null ? '?' : `${r} %`));
   b.classList.toggle('low', r !== null && r < 20);
 }
 
@@ -313,7 +318,7 @@ function drawSend(): void {
   send.title = state.streaming
     ? (refine ? 'Préciser l\'exécution en cours (Ctrl+Entrée : mettre en file d\'attente)' : 'Mettre en file d\'attente (Ctrl+Entrée : préciser)')
     : 'Envoyer (Entrée)';
-  send.textContent = state.streaming ? (refine ? '⚡' : '⏳') : '➤';
+  send.innerHTML = state.streaming ? (refine ? ICONS.bolt : ICONS.queue) : ICONS.send;
   $('stop').hidden = !state.streaming;
   $('busyMenu').hidden = !state.streaming;
 }
