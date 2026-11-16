@@ -59,6 +59,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
 import javax.swing.AbstractAction
+import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.BorderFactory
 import javax.swing.Icon
@@ -1126,14 +1127,25 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         content?.icon = icon
     }
 
-    private fun quotaLine(title: String, w: QuotaWindow?, now: Long): String {
-        val used = Quota.percent(w, now) ?: return "<b>$title</b> : pas encore mesuré"
+    /** Une fenêtre de quota : titre et pourcentages, jauge colorée, puis moment de la réinitialisation. */
+    private fun quotaBlock(title: String, w: QuotaWindow?, now: Long): JComponent {
+        val used = Quota.percent(w, now)
+        val col = JPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS); isOpaque = false; alignmentX = java.awt.Component.LEFT_ALIGNMENT }
+        if (used == null) {
+            col.add(JBLabel("<html><b>$title</b> : pas encore mesuré</html>"))
+            return col
+        }
         val reset = w!!.resetsAt
         val whenTxt = if (reset > now) {
             val at = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochSecond(reset), java.time.ZoneId.systemDefault())
             "réinitialisation dans ${Quota.remaining(reset, now)} (${java.time.format.DateTimeFormatter.ofPattern("EEE HH:mm").format(at)})"
         } else "fenêtre réinitialisée"
-        return "<b>$title</b> : $used % utilisé · ${100 - used} % restant<br/><font color='gray'>$whenTxt</font>"
+        col.add(JBLabel("<html><b>$title</b> : $used % utilisé · ${100 - used} % restant</html>"))
+        col.add(Box.createVerticalStrut(JBUI.scale(3)))
+        col.add(QuotaBar(used).apply { alignmentX = java.awt.Component.LEFT_ALIGNMENT })
+        col.add(Box.createVerticalStrut(JBUI.scale(3)))
+        col.add(JBLabel(whenTxt).apply { foreground = UIUtil.getContextHelpForeground() })
+        return col
     }
 
     /**
@@ -1166,8 +1178,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val st = settings.state
         val measured = if (st.rlAt > 0) "Dernière mesure il y a ${Quota.remaining(now, st.rlAt / 1000)}" else "Aucune mesure pour l'instant"
         val html = "<html><body style='width:340px'>" +
-            quotaLine("Session de 5 h", fiveHourWindow(), now) + "<br/><br/>" +
-            quotaLine("Semaine (7 jours)", weekWindow(), now) + "<br/><br/>" +
             "<b>Cette conversation</b><br/>" +
             "Modèle : ${activeModel?.let { ModelCatalog.display(it) } ?: ModelCatalog.display(selectedModel)}<br/>" +
             "Contexte : ${fmt(liveCtx)} tokens<br/>" +
@@ -1176,8 +1186,16 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             (quotaError?.let { "<br/><font color='red'>Mesure impossible : ${StringUtil.escapeXmlEntities(it)}</font>" } ?: "") +
             (if (noQuotaLastTurn) "<br/><font color='red'>La CLI n'a envoyé aucun quota pendant la dernière réponse.</font>" else "") +
             "<br/><font color='gray'>$measured. Les quotas sont fournis par la CLI après chaque réponse.</font></body></html>"
+        val quotas = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS); isOpaque = false
+            add(quotaBlock("Session de 5 h", fiveHourWindow(), now))
+            add(Box.createVerticalStrut(JBUI.scale(10)))
+            add(quotaBlock("Semaine (7 jours)", weekWindow(), now))
+            add(Box.createVerticalStrut(JBUI.scale(10)))
+        }
         val panel = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(10)
+            add(quotas, BorderLayout.NORTH)
             add(JBLabel(html), BorderLayout.CENTER)
             add(JButton("Actualiser").apply {
                 toolTipText = "Mesure les quotas maintenant (requête minimale, quelques millièmes de dollar)"

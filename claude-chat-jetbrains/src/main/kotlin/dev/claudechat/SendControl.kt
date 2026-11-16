@@ -312,3 +312,27 @@ fun composerCard(
     })
     return card
 }
+
+/** Jauge horizontale du pourcentage utilisé : verte, puis orange (≥ 60 %) et rouge (≥ 85 %). */
+class QuotaBar(private val percent: Int) : JComponent() {
+    init { isOpaque = false }
+    override fun getPreferredSize() = Dimension(JBUI.scale(340), JBUI.scale(10))
+    override fun getMaximumSize() = Dimension(Int.MAX_VALUE, JBUI.scale(10))
+    override fun paintComponent(g: Graphics) {
+        val g2 = g.create() as Graphics2D
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+        val arc = height
+        g2.color = JBColor(Color(0, 0, 0, 30), Color(255, 255, 255, 40))
+        g2.fillRoundRect(0, 0, width, height, arc, arc)
+        val w = (width * percent.coerceIn(0, 100) / 100.0).toInt()
+        if (w > 0) {
+            g2.color = when {
+                percent >= 85 -> JBColor(Color(0xC62828), Color(0xE57373))
+                percent >= 60 -> JBColor(Color(0xEF6C00), Color(0xFFB74D))
+                else -> JBColor(Color(0x2E7D32), Color(0x6AAB73))
+            }
+            g2.fillRoundRect(0, 0, maxOf(w, arc), height, arc, arc)
+        }
+        g2.dispose()
+    }
+}
