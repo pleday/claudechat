@@ -150,6 +150,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     // Pastille flottante en bas de la conversation : visible quand on est remonté, un clic revient tout en bas
     // (et la conversation est de nouveau suivie automatiquement, voir render)
     private val toBottomPill = object : JPanel(BorderLayout()) {
+        override fun getMaximumSize() = preferredSize
         override fun paintComponent(g: java.awt.Graphics) {
             val g2 = g.create() as java.awt.Graphics2D
             g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
@@ -164,15 +165,17 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         alignmentX = 0.5f; alignmentY = 1f
         border = JBUI.Borders.empty(2, 4)
         add(FlatButton("Aller en bas", AllIcons.General.ArrowDown) { scrollToBottom() }.apply { toolTipText = "Revenir au dernier message et suivre la conversation" }, BorderLayout.CENTER)
-        maximumSize = preferredSize
     }
     private val scrollHost = JPanel().apply {
         layout = javax.swing.OverlayLayout(this)
-        add(JPanel(BorderLayout()).apply {
+        // le conteneur reprend la taille de la pastille (même invisible) : sinon OverlayLayout lui donne une taille nulle
+        add(object : JPanel(BorderLayout()) {
+            override fun getPreferredSize() = toBottomPill.preferredSize.let { java.awt.Dimension(it.width, it.height + JBUI.scale(10)) }
+            override fun getMaximumSize() = preferredSize
+        }.apply {
             isOpaque = false; alignmentX = 0.5f; alignmentY = 1f
             border = JBUI.Borders.emptyBottom(10)
             add(toBottomPill, BorderLayout.CENTER)
-            maximumSize = java.awt.Dimension(preferredSize.width, preferredSize.height)
         })
         add(scroll)
     }
