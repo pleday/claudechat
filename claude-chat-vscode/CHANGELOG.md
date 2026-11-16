@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.3
+
+- **Fichiers modifiés par Claude** : moins de bruit. Les fichiers écrits dans un dossier temporaire (`/tmp`, scratchpad de Claude), dans `.claude/worktrees` ou dans un dossier généré (`build`, `node_modules`…) ne sont plus listés, et les worktrees ne sont plus parcourus par la détection des changements faits par les commandes
+
 ## 0.9.2
 
 - **Licence MIT** : l'extension est désormais publiée sous licence MIT (fichier `LICENSE` à la racine du dépôt)
