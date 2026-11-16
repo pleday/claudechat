@@ -22,6 +22,14 @@ class LinkifyTest {
         assertEquals("<p>voir <a href=\"open:img/logo.png\">img/logo.png</a>.</p>", l.images("<p>voir img/logo.png.</p>"))
     }
 
+    @Test fun readableImageBecomesScaledThumbnail() {
+        val t = Linkify({ "/p" }, ttlMs = 1000, now = { clock }, exists = { it in present }, imageSize = { 880 to 320 })
+        val html = t.images("<p>voir img/logo.png.</p>")
+        assertTrue("<a href=\"open:img/logo.png\"><img src=\"file:/p/img/logo.png\" width=\"220\" height=\"80\"" in html, html)
+        val small = Linkify({ "/p" }, ttlMs = 1000, now = { clock }, exists = { it in present }, imageSize = { 40 to 30 })
+        assertTrue("width=\"40\" height=\"30\"" in small.images("img/logo.png")) // jamais agrandie
+    }
+
     @Test fun imagesInsideCodeBlocksAreIgnoredButNotInToolCards() {
         val code = "<table><tr><td class='cb'><code>load(\"img/logo.png\")</code></td></tr></table>"
         assertEquals(code, l.images(code))
