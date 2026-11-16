@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2
+
+- **Licence MIT** : l'extension est désormais publiée sous licence MIT (fichier `LICENSE` à la racine du dépôt)
+
 ## 0.9.1
 
 - **Suggestion du message suivant** : elle devient le texte par défaut du champ de saisie vide (Tab l'insère) au lieu d'une pastille
