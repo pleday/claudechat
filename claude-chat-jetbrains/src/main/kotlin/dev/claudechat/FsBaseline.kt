@@ -51,7 +51,8 @@ class FsBaseline(
         if (!Files.isDirectory(base)) return Walk(files, false)
         Files.walkFileTree(base, emptySet(), Int.MAX_VALUE, object : FileVisitor<Path> {
             override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult =
-                if (dir != base && skipDir(dir.fileName.toString())) FileVisitResult.SKIP_SUBTREE else FileVisitResult.CONTINUE
+                if (dir != base && (skipDir(dir.fileName.toString()) || inIgnoredSubpath(base.relativize(dir).joinToString("/"))))
+                    FileVisitResult.SKIP_SUBTREE else FileVisitResult.CONTINUE
 
             override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
                 if (!attrs.isRegularFile || skipFile(file.fileName.toString())) return FileVisitResult.CONTINUE

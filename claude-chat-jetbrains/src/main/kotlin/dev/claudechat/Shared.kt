@@ -29,6 +29,7 @@ object Constants {
     val slashPrompts: Map<String, String> = j["slashPrompts"].asJsonObject.entrySet().associate { it.key to it.value.asString }
     val commitPrompt: String = j["commitPrompt"].asString
     val generatedDirs: Set<String> = j["generatedDirs"].asJsonArray.map { it.asString }.toSet()
+    val ignoredSubpaths: List<String> = j["ignoredSubpaths"].asJsonArray.map { it.asString }
     val videoExtensions: Set<String> = j["videoExtensions"].asJsonArray.map { it.asString }.toSet()
 
     val maxAttachChars: Int = limits["maxAttachChars"].asInt

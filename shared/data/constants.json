@@ -25,6 +25,7 @@
   },
   "commitPrompt": "Rédige le message de commit pour les changements ci-dessous, au format Conventional Commits : un titre de 72 caractères maximum, une ligne vide, puis un corps concis (puces) seulement si c'est utile. Réponds uniquement avec le message, sans bloc de code ni commentaire.\n\n",
   "generatedDirs": [".git", ".idea", ".gradle", ".kotlin", ".svn", ".hg", ".venv", "venv", "node_modules", "build", "out", "target", "dist", ".next", "__pycache__", ".cache", ".vscode-test"],
+  "ignoredSubpaths": [".claude/worktrees"],
   "videoExtensions": ["mp4", "mov", "m4v", "webm", "mkv", "avi", "mpg", "mpeg", "wmv", "flv", "3gp"],
   "limits": {
     "maxAttachChars": 120000,

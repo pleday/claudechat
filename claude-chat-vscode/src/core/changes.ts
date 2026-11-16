@@ -3,7 +3,8 @@ import * as fsSync from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import type { Json } from './cli';
-import { GENERATED_DIRS, LIMITS } from './constants';
+import * as os from 'node:os';
+import { GENERATED_DIRS, IGNORED_SUBPATHS, LIMITS } from './constants';
 
 export type ChangeStatus = 'modified' | 'new' | 'deleted';
 
@@ -42,6 +43,29 @@ export function lineStats(old: string, next: string): [number, number] {
   return [a, r];
 }
 
+const TMP_ROOTS = [...new Set(['/tmp', os.tmpdir()].map((t) => t.replace(/\\/g, '/').replace(/\/+$/, '')))];
+
+/** Le dossier `dirs` (chemin relatif au projet, séparé par `/`) est dans un sous-chemin ignoré (ex. `.claude/worktrees`). */
+function inIgnoredSubpath(dirs: string): boolean {
+  const s = `/${dirs}/`;
+  return IGNORED_SUBPATHS.some((sub) => s.includes(`/${sub}/`));
+}
+
+/**
+ * Chemin à ne pas présenter comme un fichier modifié par Claude : bruit qu'il produit sans que ce soit le travail de l'utilisateur.
+ * Dans le projet : dossiers générés (`build`, `node_modules`…) et worktrees de Claude (`.claude/worktrees`). Hors du projet :
+ * dossiers temporaires (scratchpad de Claude, `/tmp`…). Les autres fichiers hors projet restent suivis.
+ */
+export function isIgnoredPath(file: string, root: string): boolean {
+  const p = file.replace(/\\/g, '/');
+  const r = root.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (p.startsWith(`${r}/`)) {
+    const dirs = p.slice(r.length + 1).split('/').slice(0, -1);
+    return dirs.some((d) => GENERATED_DIRS.has(d)) || inIgnoredSubpath(dirs.join('/'));
+  }
+  return TMP_ROOTS.some((t) => p.startsWith(`${t}/`));
+}
+
 /**
  * Fichiers modifiés par Claude pendant la conversation. Le contenu d'un fichier est mémorisé juste avant le premier
  * outil qui le modifie (Edit, Write, MultiEdit, NotebookEdit) : la comparaison montre ainsi tout ce que Claude a changé
@@ -74,7 +98,7 @@ export class ChangeTracker {
     const raw = input.file_path ?? input.notebook_path ?? input.path;
     if (typeof raw !== 'string') return;
     const p = this.abs(raw);
-    if (this.before.has(p)) return;
+    if (this.before.has(p) || isIgnoredPath(p, this.cwd())) return;
     let old: string | null;
     try { old = this.read(p); } catch { return; } // fichier illisible (binaire, trop gros) : non suivi
     this.before.set(p, old);
@@ -85,7 +109,10 @@ export class ChangeTracker {
    * fichiers qu'elle a créés, modifiés ou supprimés, avec leur état d'avant. Un fichier déjà suivi garde son état initial.
    */
   async afterCommand(baseline: FsBaseline, startMs: number, endMs: number): Promise<void> {
-    for (const o of await baseline.scan(startMs, endMs)) if (!this.before.has(o.path)) this.before.set(o.path, o.before);
+    const root = this.cwd();
+    for (const o of await baseline.scan(startMs, endMs)) {
+      if (!this.before.has(o.path) && !isIgnoredPath(o.path, root)) this.before.set(o.path, o.before);
+    }
   }
 
   /** Fin d'une réponse : mémorise l'état des fichiers suivis. */
@@ -120,7 +147,7 @@ export class ChangeTracker {
       let now: string | null;
       try { now = this.read(p); } catch { continue; }
       const rel = p.startsWith(base + path.sep) ? p.slice(base.length + 1) : p;
-      if (old === null && now === null) continue;
+      if (old === null && now === null) continue; // créé puis supprimé (ou écriture pas encore faite) : rien à montrer
       if (old === null) out.push({ path: p, rel, status: 'new', added: lineCount(now!), removed: 0, before: null });
       else if (now === null) out.push({ path: p, rel, status: 'deleted', added: 0, removed: lineCount(old), before: old });
       else if (old !== now) { const [a, r] = this.stats(old, now); out.push({ path: p, rel, status: 'modified', added: a, removed: r, before: old }); }
@@ -168,7 +195,7 @@ export class FsBaseline {
       for (const it of items) {
         if (cut) return;
         const full = path.join(dir, it.name);
-        if (it.isDirectory()) { if (!this.skipDir(it.name)) await visit(full); continue; }
+        if (it.isDirectory()) { if (!this.skipDir(it.name) && !inIgnoredSubpath(path.relative(base, full).split(path.sep).join('/'))) await visit(full); continue; }
         if (!it.isFile() || this.skipFile(it.name)) continue;
         if (files.size >= this.maxEntries) { cut = true; return; }
         try { const st = await fs.stat(full); files.set(full, { size: st.size, mtime: Math.floor(st.mtimeMs) }); } catch { /* disparu */ }

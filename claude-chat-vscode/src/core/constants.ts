@@ -9,5 +9,6 @@ export const QUOTA_PROBE_MODEL: string = data.quotaProbeModel;
 export const SLASH_PROMPTS: Record<string, string> = data.slashPrompts;
 export const COMMIT_PROMPT: string = data.commitPrompt;
 export const GENERATED_DIRS = new Set<string>(data.generatedDirs);
+export const IGNORED_SUBPATHS: string[] = data.ignoredSubpaths;
 export const VIDEO_EXTENSIONS = new Set<string>(data.videoExtensions);
 export const LIMITS = data.limits;

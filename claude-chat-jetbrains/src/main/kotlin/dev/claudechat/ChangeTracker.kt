@@ -15,6 +15,27 @@ data class ChangedFile(
     val path: String, val rel: String, val status: ChangeStatus, val added: Int, val removed: Int, val before: String?,
 )
 
+private val TMP_ROOTS: List<String> =
+    listOf("/tmp", System.getProperty("java.io.tmpdir").orEmpty()).filter { it.isNotEmpty() }.map { it.replace('\\', '/').trimEnd('/') }.distinct()
+
+/** Le dossier [dirs] (chemin relatif au projet, séparé par `/`) est dans un sous-chemin ignoré (ex. `.claude/worktrees`). */
+fun inIgnoredSubpath(dirs: String): Boolean = "/$dirs/".let { s -> Constants.ignoredSubpaths.any { s.contains("/$it/") } }
+
+/**
+ * Chemin à ne pas présenter comme un fichier modifié par Claude : bruit qu'il produit sans que ce soit le travail de l'utilisateur.
+ * Dans le projet : dossiers générés (`build`, `node_modules`…) et worktrees de Claude (`.claude/worktrees`). Hors du projet :
+ * dossiers temporaires (scratchpad de Claude, `/tmp`…). Les autres fichiers hors projet restent suivis.
+ */
+fun isIgnoredPath(file: String, root: String): Boolean {
+    val p = file.replace('\\', '/')
+    val r = root.replace('\\', '/').trimEnd('/')
+    if (p.startsWith("$r/")) {
+        val dirs = p.substring(r.length + 1).split('/').dropLast(1)
+        return dirs.any { it in Constants.generatedDirs } || inIgnoredSubpath(dirs.joinToString("/"))
+    }
+    return TMP_ROOTS.any { p.startsWith("$it/") }
+}
+
 /** Contenu d'un fichier texte ; null s'il n'existe pas ; IOException s'il est trop gros ou illisible comme du texte (binaire). */
 fun readTextOrNull(path: String, maxBytes: Long = 2L * 1024 * 1024): String? {
     val p = Path.of(path)
@@ -47,6 +68,7 @@ class ChangeTracker(
         if (tool !in TOOLS) return
         val raw = (input["file_path"] ?: input["notebook_path"] ?: input["path"])?.takeIf { it.isJsonPrimitive }?.asString ?: return
         val path = abs(raw)
+        if (isIgnoredPath(path, cwd())) return
         synchronized(this) { if (path in before) return }
         // lecture hors verrou ; fichier illisible (binaire, trop gros) : non suivi
         val old = try { read(path) } catch (_: Exception) { return }
@@ -58,7 +80,11 @@ class ChangeTracker(
      * fichiers qu'elle a créés, modifiés ou supprimés, avec leur état d'avant. Un fichier déjà suivi garde son état initial.
      */
     fun afterCommand(baseline: FsBaseline, startMillis: Long, endMillis: Long) {
-        for (o in baseline.scan(startMillis, endMillis)) synchronized(this) { if (o.path !in before) before[o.path] = o.before }
+        val root = cwd()
+        for (o in baseline.scan(startMillis, endMillis)) {
+            if (isIgnoredPath(o.path, root)) continue
+            synchronized(this) { if (o.path !in before) before[o.path] = o.before }
+        }
     }
 
     // Contenu de chaque fichier suivi à la fin de la dernière réponse : si, au début de la suivante, il a changé, c'est que
@@ -98,7 +124,7 @@ class ChangeTracker(
             val now = try { read(path) } catch (_: Exception) { return@mapNotNull null }
             val rel = path.removePrefix("$base/")
             when {
-                old == null && now == null -> null
+                old == null && now == null -> null      // créé puis supprimé (ou écriture pas encore faite) : rien à montrer
                 old == null -> ChangedFile(path, rel, ChangeStatus.NEW, LineDiff.lineCount(now!!), 0, null)
                 now == null -> ChangedFile(path, rel, ChangeStatus.DELETED, 0, LineDiff.lineCount(old), old)
                 old == now -> null
