@@ -35,6 +35,7 @@ clair **et** en thème sombre. Garder `build/idea-sandbox/IC-2024.3/log/idea.log
 - [ ] Clic sur la pastille : l'arbre des changements de l'IDE s'ouvre ; double-clic ou Ctrl+D ouvre la comparaison (avant Claude / actuel) ; la navigation passe d'un fichier au suivant.
 - [ ] Un fichier créé s'ouvre avec une partie gauche vide.
 - [ ] Demander une commande Bash qui crée, modifie, supprime et renomme (`mv`) des fichiers : tous apparaissent.
+- [ ] Faire écrire un fichier dans `/tmp` (ou le dossier temporaire de Claude) et dans `.claude/worktrees/…`, puis créer et supprimer un fichier du projet : aucun n'apparaît dans la liste.
 - [ ] Modifier un fichier **à la main** dans l'éditeur : il n'apparaît pas ; modifier à la main un fichier déjà modifié par Claude entre deux réponses : il repart de zéro.
 - [ ] Commit automatique ou fichier non ajouté à git : la liste est inchangée.
 - [ ] « effacer » (croix de la pastille) vide la liste. Aucune erreur « Slow operations are prohibited on EDT » dans le log.

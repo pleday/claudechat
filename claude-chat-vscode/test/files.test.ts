@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, statSync, utimesSync, writeFileSync, rmSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ChangeTracker, FsBaseline, GENERATED_DIRS, lineCount, lineStats, readTextOrNull } from '../src/core/changes';
+import { ChangeTracker, FsBaseline, GENERATED_DIRS, isIgnoredPath, lineCount, lineStats, readTextOrNull } from '../src/core/changes';
 import * as mcp from '../src/core/mcp';
 import { deleteSession, listSessions, liveTitle, loadSession, paths, projectDir, renameSession, setArchived } from '../src/core/sessions';
 import { tmp } from './helpers';
@@ -94,6 +94,26 @@ describe('fichiers modifiés par Claude', () => {
     const t = new ChangeTracker(() => dir);
     return { dir, t, f: (n: string) => join(dir, n) };
   }
+
+  it('ignore le bruit : dossier temporaire, worktrees de Claude, dossiers générés', () => {
+    const { dir, t, f } = setup();
+    const scratch = join(tmp(), 'scratchpad.txt');                // hors du projet, dans le dossier temporaire
+    writeFileSync(scratch, 'x');
+    mkdirSync(join(dir, '.claude', 'worktrees', 'w'), { recursive: true }); mkdirSync(join(dir, 'build'));
+    const wt = join(dir, '.claude', 'worktrees', 'w', 'a.txt'); const gen = f('build/o.js');
+    writeFileSync(wt, 'x'); writeFileSync(gen, 'x');
+    for (const p of [scratch, wt, gen]) { t.beforeEdit('Write', { file_path: p }); writeFileSync(p, 'y'); }
+    expect(t.isEmpty).toBe(true);
+    expect(isIgnoredPath(f('src/A.ts'), dir)).toBe(false);
+  });
+
+  it('un fichier créé puis supprimé n\'apparaît plus', () => {
+    const { t, f } = setup();
+    t.beforeEdit('Write', { file_path: f('tmp.sh') }); writeFileSync(f('tmp.sh'), 'x');
+    expect(t.changes()).toHaveLength(1);
+    rmSync(f('tmp.sh'));
+    expect(t.changes()).toEqual([]);
+  });
 
   it('mémorise l\'état avant la première modification seulement', () => {
     const { t, f } = setup();
@@ -206,6 +226,17 @@ describe('fichiers modifiés par Claude', () => {
       writeFileSync(join(dir, 'b.bin'), Buffer.from([9, 0, 9])); writeFileSync(join(dir, 'g.txt'), 'y'.repeat(300_000));
       expect(await b.scan(Date.now() - 1000, Date.now() + 1000)).toEqual([]);
       void statSync;
+    });
+
+    it('ne descend pas dans .claude/worktrees (checkouts complets de Claude)', async () => {
+      const dir = tmp();
+      mkdirSync(join(dir, '.claude', 'worktrees', 'w'), { recursive: true }); writeFileSync(join(dir, '.claude', 'worktrees', 'w', 'a.txt'), 'x');
+      writeFileSync(join(dir, 'keep.txt'), 'k');
+      const b = new FsBaseline(() => dir);
+      await b.capture();
+      expect(b.fileCount).toBe(1);
+      writeFileSync(join(dir, '.claude', 'worktrees', 'w', 'b.txt'), 'y'); writeFileSync(join(dir, 'new.txt'), 'n');
+      expect((await b.scan(0, Date.now() + 1000)).map((o) => o.path)).toEqual([join(dir, 'new.txt')]);
     });
 
     it('le suivi attribue à Claude ce que la commande a fait', async () => {

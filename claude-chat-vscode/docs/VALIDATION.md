@@ -38,6 +38,7 @@ Se passe dans le VS Code de développement (`make run`) puis, pour la section G,
 - [ ] Clic sur la pastille : l'éditeur de comparaison multiple s'ouvre (avant Claude ↔ actuel) ; un clic sur un fichier de la vue ouvre sa comparaison.
 - [ ] Un fichier créé s'ouvre avec une partie gauche vide ; un fichier supprimé avec une partie droite vide.
 - [ ] Demander une commande Bash qui crée, modifie, supprime et renomme (`mv`) des fichiers : tous apparaissent.
+- [ ] Faire écrire un fichier dans `/tmp` (ou le dossier temporaire de Claude) et dans `.claude/worktrees/…`, puis créer et supprimer un fichier du projet : aucun n'apparaît dans la liste.
 - [ ] Modifier un fichier **à la main** : il n'apparaît pas ; modifier à la main un fichier déjà modifié par Claude entre deux réponses : il repart de zéro.
 - [ ] Commit automatique ou fichier non ajouté à git : la liste est inchangée.
 - [ ] La croix de la pastille (ou le bouton de la vue) vide la liste.

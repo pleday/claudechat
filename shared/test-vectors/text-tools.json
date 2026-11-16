@@ -891,5 +891,77 @@
    "in": "\n\n",
    "out": 2
   }
+ ],
+ "ignoredPath": [
+  {
+   "in": {
+    "path": "/home/u/proj/src/A.kt",
+    "root": "/home/u/proj"
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "path": "/home/u/proj/.claude/worktrees/x/src/A.kt",
+    "root": "/home/u/proj"
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "path": "/home/u/proj/.claude/settings.local.json",
+    "root": "/home/u/proj"
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "path": "/home/u/proj/node_modules/p/i.js",
+    "root": "/home/u/proj"
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "path": "/home/u/proj/build",
+    "root": "/home/u/proj"
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "path": "/home/u/proj/a/dist/o.js",
+    "root": "/home/u/proj/"
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "path": "/tmp/claude-1000/scratchpad/t.sh",
+    "root": "/home/u/proj"
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "path": "/home/u/other/B.kt",
+    "root": "/home/u/proj"
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "path": "/home/u/projet2/A.kt",
+    "root": "/home/u/proj"
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "path": "C:\\w\\p\\.claude\\worktrees\\a\\f.ts",
+    "root": "C:\\w\\p"
+   },
+   "out": true
+  }
  ]
 }

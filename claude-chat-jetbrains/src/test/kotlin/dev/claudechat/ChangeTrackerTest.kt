@@ -48,6 +48,24 @@ class ChangeTrackerTest {
         assertEquals(ChangeStatus.DELETED, c.status); assertEquals(2, c.removed)
     }
 
+    @Test fun noiseIsNeverTracked() {
+        val t = tracker()
+        val scratch = Files.createTempFile("scratch", ".txt")            // hors du projet, dans le dossier temporaire
+        val wt = file(".claude/worktrees/w/A.kt", "x"); val gen = file("build/o.js", "x")
+        for (p in listOf(scratch, wt, gen)) { t.beforeEdit("Write", input(p.toString())); Files.writeString(p, "y") }
+        assertTrue(t.isEmpty)
+        assertFalse(isIgnoredPath(tmp.resolve("src/A.kt").toString(), tmp.toString()))
+        Files.deleteIfExists(scratch)
+    }
+
+    @Test fun createdThenDeletedFileIsNoLongerListed() {
+        val f = tmp.resolve("tmp.sh")
+        val t = tracker(); t.beforeEdit("Write", input(f.toString())); Files.writeString(f, "x")
+        assertEquals(1, t.changes().size)
+        Files.delete(f)
+        assertTrue(t.changes().isEmpty())
+    }
+
     @Test fun unchangedOrRefusedEditsAreNotListed() {
         val f = file("A.kt", "contenu")
         val t = tracker()

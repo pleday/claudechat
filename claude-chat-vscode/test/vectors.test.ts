@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseRateLimits, cleanSuggestion } from '../src/core/cli';
 import { fmtTokens, parseCommands, parseContextUsage, parseModels, contextPercent } from '../src/core/cliInfo';
-import { lineCount } from '../src/core/changes';
+import { isIgnoredPath, lineCount } from '../src/core/changes';
 import { InputHistory } from '../src/core/inputHistory';
 import * as mcp from '../src/core/mcp';
 import { ModelCatalog } from '../src/core/models';
@@ -55,6 +55,7 @@ const handlers: Record<string, Record<string, Handler>> = {
     modelLabel: (i) => catalog().label(i),
     modelResolve: (i) => catalog().resolve(i),
     lineCount: (i) => lineCount(i),
+    ignoredPath: (i) => isIgnoredPath(i.path, i.root),
   },
   'cli-parsing': {
     rateLimits: (i) => parseRateLimits(i) ?? null,

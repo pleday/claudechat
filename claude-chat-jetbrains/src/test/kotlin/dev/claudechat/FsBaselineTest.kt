@@ -47,6 +47,14 @@ class FsBaselineTest {
         assertTrue(b.scan(T0, T1).isEmpty())
     }
 
+    @Test fun claudeWorktreesAreNotWalked() {
+        put(".claude/worktrees/w/a.txt", "x"); put("keep.txt", "k")
+        val b = base(); b.capture()
+        assertEquals(1, b.fileCount)
+        put(".claude/worktrees/w/b.txt", "y", INSIDE); put("new.txt", "n", INSIDE)
+        assertEquals(mapOf("new.txt" to FsBaseline.Kind.NEW), kinds(b.scan(T0, T1)))
+    }
+
     @Test fun createdAndDeletedFilesAreReported() {
         put("gone.txt", "bye"); put("keep.txt", "k")
         val b = base(); b.capture()
