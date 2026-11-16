@@ -97,3 +97,8 @@ fonctionnelle (`*/docs/VALIDATION.md`).
 - **Plugin JetBrains** : tag `vX.Y.Z`, release GitHub avec le zip, puis `claude-chat-jetbrains/scripts/update-repo.sh` met à jour
   `updatePlugins.xml` (à laisser à la **racine** : c'est l'URL interrogée par les IDE des utilisateurs). Détails dans le README du plugin.
 - **Extension VS Code** : tag `vscode-vX.Y.Z`, release GitHub avec le `.vsix` (`make -C claude-chat-vscode package`).
+
+## Licence
+
+[MIT](LICENSE) © 2026 Pierrick Le Day : vous pouvez utiliser, modifier et distribuer ce logiciel librement, y compris à des fins
+commerciales, à condition de conserver la mention de copyright et le texte de la licence.

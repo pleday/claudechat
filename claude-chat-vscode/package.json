@@ -4,7 +4,7 @@
   "description": "Interface graphique pour Claude Code (CLI claude) : conversation en streaming, cartes d'outils, approbation des actions, diff modifiable, sessions reprenables, MCP, message de commit.",
   "version": "0.9.1",
   "publisher": "pleday",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "repository": {
     "type": "git",
