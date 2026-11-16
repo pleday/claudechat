@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.3
+
+- **Fichiers modifiés par Claude** : la fenêtre n'a plus de bouton « Effacer la liste » ; chaque fichier a sa case à cocher (comme la fenêtre « Rollback » d'IntelliJ) et « Rollback » remet les fichiers cochés dans leur état d'avant Claude (les fichiers créés par Claude sont supprimés si la case « Supprimer les fichiers créés par Claude » est cochée). Le bouton est grisé quand rien n'est coché ; « Ouvrir le fichier » ouvre le fichier sélectionné dans l'éditeur
+
 ## 0.9.2
 
 - **Images dans la conversation** : un chemin d'image existant cité par Claude (texte, code en ligne, carte d'outil comme `Read`) s'affiche en miniature (160 × 110 px au plus, jamais agrandie) au lieu d'un lien ; un clic l'ouvre. Les images que vous joignez apparaissent aussi en petites miniatures (110 × 80 px, 6 au plus, sur une ligne) dans votre message, y compris à la reprise d'une session
