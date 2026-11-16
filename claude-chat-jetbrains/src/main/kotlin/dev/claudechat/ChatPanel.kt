@@ -150,7 +150,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     // Pastille flottante en bas de la conversation : visible quand on est remonté, un clic revient tout en bas
     // (et la conversation est de nouveau suivie automatiquement, voir render)
     private val toBottomPill = object : JPanel(BorderLayout()) {
-        override fun getMaximumSize() = preferredSize
         override fun paintComponent(g: java.awt.Graphics) {
             val g2 = g.create() as java.awt.Graphics2D
             g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
@@ -162,21 +161,22 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
     }.apply {
         isOpaque = false; isVisible = false
-        alignmentX = 0.5f; alignmentY = 1f
         border = JBUI.Borders.empty(2, 4)
         add(FlatButton("Aller en bas", AllIcons.General.ArrowDown) { scrollToBottom() }.apply { toolTipText = "Revenir au dernier message et suivre la conversation" }, BorderLayout.CENTER)
     }
-    private val scrollHost = JPanel().apply {
-        layout = javax.swing.OverlayLayout(this)
-        // le conteneur reprend la taille de la pastille (même invisible) : sinon OverlayLayout lui donne une taille nulle
-        add(object : JPanel(BorderLayout()) {
-            override fun getPreferredSize() = toBottomPill.preferredSize.let { java.awt.Dimension(it.width, it.height + JBUI.scale(10)) }
-            override fun getMaximumSize() = preferredSize
-        }.apply {
-            isOpaque = false; alignmentX = 0.5f; alignmentY = 1f
-            border = JBUI.Borders.emptyBottom(10)
-            add(toBottomPill, BorderLayout.CENTER)
-        })
+    // La conversation remplit le panneau ; la pastille est posée par-dessus, centrée, à 10 px du bas (ajoutée en premier : peinte au-dessus)
+    private val scrollHost = JPanel(object : java.awt.LayoutManager {
+        override fun addLayoutComponent(name: String?, comp: java.awt.Component?) {}
+        override fun removeLayoutComponent(comp: java.awt.Component?) {}
+        override fun preferredLayoutSize(parent: java.awt.Container) = scroll.preferredSize
+        override fun minimumLayoutSize(parent: java.awt.Container) = scroll.minimumSize
+        override fun layoutContainer(parent: java.awt.Container) {
+            scroll.setBounds(0, 0, parent.width, parent.height)
+            val d = toBottomPill.preferredSize
+            toBottomPill.setBounds((parent.width - d.width) / 2, parent.height - d.height - JBUI.scale(10), d.width, d.height)
+        }
+    }).apply {
+        add(toBottomPill)
         add(scroll)
     }
     private fun scrollToBottom() { val b = scroll.verticalScrollBar; b.value = b.maximum; updateToBottomPill() }
