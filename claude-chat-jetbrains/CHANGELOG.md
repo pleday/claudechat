@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.5
+
+- **Fichiers modifiés par Claude** : moins de bruit. Les fichiers écrits dans un dossier temporaire (`/tmp`, scratchpad de Claude), dans `.claude/worktrees` ou dans un dossier généré (`build`, `node_modules`…) ne sont plus listés, et les worktrees ne sont plus parcourus par la détection des changements faits par les commandes
+
 ## 0.9.4
 
 - **Arrêt de la CLI** : quand le processus `claude` s'arrête sans résultat, le message d'erreur de la CLI (stderr) est maintenant toujours affiché, au lieu d'un message générique si sa lecture n'était pas terminée
