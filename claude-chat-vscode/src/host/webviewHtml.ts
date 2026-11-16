@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type * as vscode from 'vscode';
+import { ICONS } from '../icons';
 
 /** Page du webview : coquille HTML ; tout le comportement est dans dist/webview.js. */
 export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, asUri: (...p: string[]) => vscode.Uri): string {
@@ -27,13 +28,21 @@ export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, a
 <body>
 <div id="app">
   <div id="toolbar">
-    ${btn('renameBtn', '✎', 'Renommer la conversation')}
-    ${btn('searchBtn', '🔍', 'Rechercher dans la conversation (Ctrl+F)')}
-    ${btn('forkBtn', '⑂', 'Dupliquer la conversation (fork au prochain message)')}
-    ${btn('thinkBtn', '💭', 'Afficher la réflexion')}
-    ${btn('toolsBtn', '🛠', 'Afficher les outils')}
-    ${btn('resumeBtn', '⏯', 'Reprendre automatiquement quand le quota est rempli (cette conversation)')}
-    ${btn('remoteBtn', '📱', 'Recevoir les demandes sur le téléphone (Telegram) pour cette conversation')}
+    <div class="tbg">
+      ${btn('renameBtn', ICONS.rename, 'Renommer la conversation')}
+      ${btn('searchBtn', ICONS.search, 'Rechercher dans la conversation (Ctrl+F)')}
+      ${btn('forkBtn', ICONS.fork, 'Dupliquer la conversation (fork au prochain message)')}
+    </div>
+    <span class="tbspace"></span>
+    <div class="tbg">
+      ${btn('thinkBtn', ICONS.think, 'Afficher la réflexion')}
+      ${btn('toolsBtn', ICONS.tools, 'Afficher les outils')}
+    </div>
+    <span class="tbsep"></span>
+    <div class="tbg">
+      ${btn('resumeBtn', ICONS.resume, 'Reprendre automatiquement quand le quota est rempli (cette conversation)')}
+      ${btn('remoteBtn', ICONS.remote, 'Recevoir les demandes sur le téléphone (Telegram) pour cette conversation')}
+    </div>
   </div>
   <div id="sticky" hidden></div>
   <div id="search" hidden>
