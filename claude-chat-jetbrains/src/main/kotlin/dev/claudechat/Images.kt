@@ -39,16 +39,38 @@ object Images {
     fun decode(base64: String): java.awt.image.BufferedImage? =
         runCatching { javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(Base64.getDecoder().decode(base64))) }.getOrNull()
 
-    fun scaledIcon(bi: java.awt.image.BufferedImage, maxW: Int, maxH: Int): Icon {
+    fun scaledIcon(bi: java.awt.image.BufferedImage, maxW: Int, maxH: Int): Icon = javax.swing.ImageIcon(scaled(bi, maxW, maxH))
+
+    /** Image réduite pour tenir dans [maxW] × [maxH] (jamais agrandie, ratio conservé). */
+    fun scaled(bi: java.awt.image.BufferedImage, maxW: Int, maxH: Int): java.awt.image.BufferedImage {
         val k = minOf(maxW.toDouble() / bi.width, maxH.toDouble() / bi.height, 1.0)
         val w = (bi.width * k).toInt().coerceAtLeast(1); val h = (bi.height * k).toInt().coerceAtLeast(1)
-        if (w == bi.width && h == bi.height) return javax.swing.ImageIcon(bi)
+        if (w == bi.width && h == bi.height) return bi
         // réduction en deux temps de plus d'un facteur 2 : l'interpolation bilinéaire seule crénelle
         var cur = bi
         var cw = bi.width; var ch = bi.height
         while (cw / 2 >= w && ch / 2 >= h) { cw /= 2; ch /= 2; cur = draw(cur, cw, ch) }
-        return javax.swing.ImageIcon(draw(cur, w, h))
+        return draw(cur, w, h)
     }
+
+    const val THUMB_W = 110
+    const val THUMB_H = 80
+
+    /**
+     * Miniature d'une image jointe (base64) pour l'afficher dans la conversation : un petit PNG gardé dans le dossier de
+     * données, nommé d'après le contenu (une même image n'est réduite qu'une fois). Null si l'image est illisible.
+     */
+    fun thumb(base64: String): Thumb? = runCatching {
+        val name = java.security.MessageDigest.getInstance("SHA-1").digest(base64.toByteArray()).joinToString("") { "%02x".format(it) } + ".png"
+        val file = DataHome.dir.resolve("thumbs").also { java.nio.file.Files.createDirectories(it) }.resolve(name)
+        if (java.nio.file.Files.isRegularFile(file)) {
+            Linkify.readImageSize(file.toString())?.let { (w, h) -> return@runCatching Thumb(file.toString(), w, h) }
+        }
+        val src = decode(base64) ?: return@runCatching null
+        val small = scaled(src, THUMB_W, THUMB_H)
+        javax.imageio.ImageIO.write(small, "png", file.toFile())
+        Thumb(file.toString(), small.width, small.height)
+    }.getOrNull()
 
     private fun draw(src: java.awt.image.BufferedImage, w: Int, h: Int): java.awt.image.BufferedImage {
         val out = java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB)

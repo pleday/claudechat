@@ -13,6 +13,8 @@ fun filePathOf(input: JsonObject): String? = (input["file_path"] ?: input["path"
  * (voir [RenderCache]), seule la dernière est recalculée pendant le streaming.
  */
 class TranscriptRenderer(private val cwd: () -> String) {
+    private companion object { const val MAX_THUMBS = 6 }
+
     class Theme(
         val fontFamily: String, val fontSize: Int, val codeFont: String,
         val fg: Color, val link: Color, val userBg: Color, val codeBg: Color, val you: Color, val accent: Color,
@@ -52,7 +54,14 @@ class TranscriptRenderer(private val cwd: () -> String) {
                     sb.append("<table width='100%' cellpadding='0' cellspacing='0'><tr><td width='4' bgcolor='${hex(t.you)}'>&nbsp;</td><td bgcolor='${hex(t.userBg)}'>")
                     sb.append("<table cellpadding='7' cellspacing='0'><tr><td>")
                     sb.append(speakerLabel("Vous", hex(t.you), listOfNotNull(e.attached?.let { "joint : $it" }, e.note).joinToString(" · ")))
-                    sb.append("<br/>").append(renders.render(e, e.text) { Md.toHtml(e.text) }).append("</td></tr></table></td></tr></table>")
+                    if (e.thumbs.isNotEmpty()) {
+                        // miniatures des images jointes, sur une ligne ; au-delà de 6 (images d'une vidéo), le reste est résumé
+                        sb.append("<br/>")
+                        e.thumbs.take(MAX_THUMBS).forEach { sb.append("<img src=\"${java.io.File(it.path).toURI()}\" width=\"${it.w}\" height=\"${it.h}\" border=\"0\"> ") }
+                        if (e.thumbs.size > MAX_THUMBS) sb.append("<font size='-1'>+${e.thumbs.size - MAX_THUMBS}</font>")
+                    }
+                    if (e.text.isNotBlank()) sb.append("<br/>").append(renders.render(e, e.text) { Md.toHtml(e.text) })
+                    sb.append("</td></tr></table></td></tr></table>")
                 }
                 else -> {
                     if (lastRole != "claude" && e.kind != Kind.NOTICE && e.kind != Kind.ERROR) {
@@ -84,7 +93,7 @@ class TranscriptRenderer(private val cwd: () -> String) {
         val path = filePathOf(input)
         val label = if (path != null) {
             val rel = path.removePrefix("${cwd()}/")
-            "<a href=\"open:${esc(path)}\">${esc(rel)}</a>"
+            linker.imageThumb(path) ?: "<a href=\"open:${esc(path)}\">${esc(rel)}</a>"
         } else linker.images("<code>${esc(summary.take(200))}</code>", inCode = true)
         val res = e.result?.takeIf { it.isNotBlank() }?.let {
             "<br/><font color='${if (e.isError) "red" else "gray"}' size='-1'>${esc(it.take(500)).replace("\n", "<br/>")}</font>"

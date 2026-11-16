@@ -22,7 +22,12 @@ class Entry(
     val note: String? = null,
     /** Modèle ayant produit ce contenu (réponses de Claude). */
     val model: String? = null,
+    /** Miniatures des images jointes par l'utilisateur (voir [Images.thumb]). */
+    val thumbs: List<Thumb> = emptyList(),
 )
+
+/** Miniature d'image enregistrée dans le dossier de données du plugin : chemin du fichier PNG et dimensions. */
+class Thumb(val path: String, val w: Int, val h: Int)
 
 /** Conversation en cours. L'identifiant est celui de la session de la CLI (RG-4). */
 class Session(
@@ -173,8 +178,13 @@ object SessionStore {
                 val mdl = o["message"]?.takeIf { it.isJsonObject }?.asJsonObject?.get("model")?.takeIf { it.isJsonPrimitive }?.asString
                 when (o["type"]?.asString) {
                     "user" -> {
-                        userText(o)?.let { s.entries.add(Entry(Kind.USER, it)) }
                         val c = o["message"]?.asJsonObject?.get("content")
+                        val thumbs = if (c != null && c.isJsonArray) c.asJsonArray.mapNotNull { b ->
+                            b.asJsonObject.takeIf { it["type"]?.asString == "image" }?.get("source")?.takeIf { it.isJsonObject }?.asJsonObject
+                                ?.takeIf { it["type"]?.asString == "base64" }?.get("data")?.asString?.let { Images.thumb(it) }
+                        } else emptyList()
+                        val text = userText(o)
+                        if (text != null || thumbs.isNotEmpty()) s.entries.add(Entry(Kind.USER, text.orEmpty(), thumbs = thumbs))
                         if (c != null && c.isJsonArray) c.asJsonArray.forEach { b ->
                             val bo = b.asJsonObject
                             if (bo["type"]?.asString == "tool_result") {

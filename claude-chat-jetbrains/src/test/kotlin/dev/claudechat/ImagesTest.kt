@@ -17,6 +17,19 @@ class ImagesTest {
         assertNull(Images.decode(Base64.getEncoder().encodeToString("xx".toByteArray())))
     }
 
+    @Test fun thumbIsSavedOnceAndReusedWithItsSize() {
+        val dir = java.nio.file.Files.createTempDirectory("thumbs")
+        DataHome.override = dir
+        try {
+            val t = Images.thumb(png(1100, 400))!!
+            assertEquals(110, t.w); assertEquals(40, t.h)
+            assertTrue(java.nio.file.Files.isRegularFile(java.nio.file.Path.of(t.path)))
+            val again = Images.thumb(png(1100, 400))!!
+            assertEquals(t.path, again.path); assertEquals(110, again.w); assertEquals(40, again.h)
+            assertNull(Images.thumb("pas une image"))
+        } finally { DataHome.override = null; dir.toFile().deleteRecursively() }
+    }
+
     @Test fun scalesDownKeepingRatioAndNeverUp() {
         val big = Images.decode(png(1000, 500))!!
         val i = Images.scaledIcon(big, 100, 100)

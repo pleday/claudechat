@@ -857,8 +857,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             addProperty("type", "text")
             addProperty("text", body.ifBlank { "(pièce jointe)" })
         })
-        val attached = (files.map { it.first } + images.map { it.first }).takeIf { it.isNotEmpty() }?.joinToString(", ")
-        session.entries.add(Entry(Kind.USER, text, attached = attached))
+        // les images jointes s'affichent en miniatures dans le message ; seules celles qu'on n'a pu réduire restent nommées
+        val thumbs = images.map { Images.thumb(it.third) }
+        val attached = (files.map { it.first } + images.filterIndexed { i, _ -> thumbs[i] == null }.map { it.first }).distinct()
+            .takeIf { it.isNotEmpty() }?.joinToString(", ")
+        session.entries.add(Entry(Kind.USER, text, attached = attached, thumbs = thumbs.filterNotNull()))
         if (session.entries.count { it.kind == Kind.USER } == 1) {
             session.title = (original.lineSequence().firstOrNull { it.isNotBlank() } ?: attached ?: "Pièce jointe").take(60)
         }

@@ -42,10 +42,17 @@ class Linkify(
     fun files(html: String): String = pathRegex.replace(html) { m ->
         val p = m.groupValues[1]
         if (fileExists(p)) {
+            if (isImage(p)) return@replace thumbnail(p)
             val spec = p + m.groupValues[2].takeIf { it.isNotEmpty() }?.let { ":$it" }.orEmpty()
             "<a href=\"open:$spec\"><code>$spec</code></a>"
         } else m.value
     }
+
+    private val imageExt = Regex("""\.(?:png|jpe?g|gif|webp|bmp)$""", RegexOption.IGNORE_CASE)
+    private fun isImage(p: String) = imageExt.containsMatchIn(p)
+
+    /** Miniature d'un fichier image existant (chemin absolu ou relatif au projet) ; null si ce n'en est pas une. */
+    fun imageThumb(p: String): String? = if (isImage(p) && fileExists(p)) thumbnail(p) else null
 
     private val imageRegex = Regex("""(?<![\w/.@-])((?:/|\./|\.\./)?[\w@./-]+\.(?:png|jpe?g|gif|webp|bmp))(?![\w/-])""", RegexOption.IGNORE_CASE)
     private val tagOrText = Regex("""<[^>]*>|[^<]+""")
@@ -91,8 +98,8 @@ class Linkify(
     }
 
     companion object {
-        const val THUMB_W = 220
-        const val THUMB_H = 160
+        const val THUMB_W = 160
+        const val THUMB_H = 110
 
         fun readImageSize(path: String): Pair<Int, Int>? = runCatching {
             javax.imageio.ImageIO.createImageInputStream(java.io.File(path)).use { ins ->

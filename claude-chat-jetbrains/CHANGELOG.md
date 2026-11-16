@@ -2,7 +2,7 @@
 
 ## Non publié
 
-- **Images dans la conversation** : un chemin d'image existant cité par Claude s'affiche en miniature (220 × 160 px au plus, jamais agrandie) au lieu d'un lien ; un clic l'ouvre dans l'éditeur
+- **Images dans la conversation** : un chemin d'image existant cité par Claude (texte, code en ligne, carte d'outil comme `Read`) s'affiche en miniature (160 × 110 px au plus, jamais agrandie) au lieu d'un lien ; un clic l'ouvre. Les images que vous joignez apparaissent aussi en petites miniatures (110 × 80 px, 6 au plus, sur une ligne) dans votre message, y compris à la reprise d'une session
 - **Utilisation de Claude** : une jauge colorée (verte, orange dès 60 %, rouge dès 85 %) sous chaque quota (session de 5 h, semaine) montre d'un coup d'œil le pourcentage utilisé
 - **Pastille « Aller en bas »** : quand on est remonté dans la conversation, une pastille flottante ramène au dernier message et réactive le suivi automatique
 - **Zone de saisie** : la pastille « fichiers modifiés » sort de la carte de saisie et se place au-dessus ; la suggestion du message suivant devient le texte par défaut du champ vide (Tab l'insère, et elle reste visible quand le champ a le focus), ce qui évite la mise en page bancale quand on colle une image
