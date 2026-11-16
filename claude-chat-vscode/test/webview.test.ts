@@ -186,18 +186,19 @@ describe('interface du webview', () => {
     expect($('queue').hidden).toBe(true);
   });
 
-  it('pastilles : fichiers modifiés, suggestion, pièces jointes', () => {
+  it('pastilles : fichiers modifiés, pièces jointes ; suggestion en texte par défaut', () => {
     sent.length = 0;
     host({ t: 'state', patch: {
       changes: { count: 2, added: 5, removed: 1 }, suggestion: 'Lance les tests',
       attachments: [{ key: 'a.ts', label: 'a.ts', tip: 'a.ts', kind: 'file' }, { key: 'cap.png', label: 'cap.png', tip: 'cap.png', kind: 'image', thumb: 'data:image/png;base64,AAAA' }],
     } });
     const chips = [...document.querySelectorAll('#hints .chip')];
-    expect(chips.map((c) => c.querySelector('.ctext')?.textContent)).toEqual(['📝 2 fichiers modifiés par Claude  +5 −1', '💡 Lance les tests', '📄 ', 'cap.png'].slice(0, 2).concat(['a.ts', 'cap.png']));
+    expect(chips.map((c) => c.querySelector('.ctext')?.textContent)).toEqual(['📝 2 fichiers modifiés par Claude  +5 −1', 'a.ts', 'cap.png']);
+    expect(($('input') as HTMLTextAreaElement).placeholder).toContain('💡 Lance les tests');
     expect(($('send') as HTMLButtonElement).disabled).toBe(false); // une pièce jointe suffit pour envoyer
     (chips[0].querySelector('.ctext') as HTMLElement).click();
     (chips[0].querySelector('.x') as HTMLElement).click();
-    (chips[3].querySelector('.x') as HTMLElement).click();
+    (chips[2].querySelector('.x') as HTMLElement).click();
     expect(sent).toEqual([{ t: 'openChanges' }, { t: 'forgetChanges' }, { t: 'removeAttachment', key: 'cap.png' }]);
   });
 

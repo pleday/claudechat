@@ -310,7 +310,16 @@ function drawSend(): void {
   $('busyMenu').hidden = !state.streaming;
 }
 
+const DEFAULT_PLACEHOLDER = 'Demande à Claude…   @ fichier · / commande';
+
+/** La suggestion de la suite est le texte par défaut du champ (Tab, ou Ctrl+Tab, l'insère). */
+function drawPlaceholder(): void {
+  const s = state.suggestion && !state.streaming ? state.suggestion.replace(/\s+/g, ' ') : '';
+  input.placeholder = s ? `💡 ${s.length > 90 ? `${s.slice(0, 89)}…` : s}  (Tab pour l'insérer)` : DEFAULT_PLACEHOLDER;
+}
+
 function drawHints(): void {
+  drawPlaceholder();
   const strip = $('hints');
   strip.replaceChildren();
   const chip = (icon: string, text: string, tip: string, onClick: () => void, onRemove: () => void, removeTip: string) => {
@@ -329,10 +338,6 @@ function drawHints(): void {
     chip('📝', `${ch.count} fichier${ch.count > 1 ? 's' : ''} modifié${ch.count > 1 ? 's' : ''} par Claude  +${ch.added} −${ch.removed}`,
       'Voir les modifications de Claude (comparaison avec l\'état avant)', () => post({ t: 'openChanges' }), () => post({ t: 'forgetChanges' }),
       'Oublier ces fichiers (les prochaines modifications repartent de l\'état actuel)');
-  }
-  if (state.suggestion && !state.streaming) {
-    chip('💡', state.suggestion, 'Cliquer (ou Tab dans le champ vide) pour l\'insérer', () => { post({ t: 'acceptSuggestion' }); input.focus(); },
-      () => post({ t: 'dismissSuggestion' }), 'Ignorer la suggestion');
   }
   for (const a of state.attachments) {
     const c = el('div', 'chip');
@@ -507,7 +512,7 @@ input.addEventListener('keydown', (e) => {
     send(e.ctrlKey || e.metaKey ? other : undefined);
     return;
   }
-  if (e.key === 'Tab' && !input.value && state.suggestion) { e.preventDefault(); post({ t: 'acceptSuggestion' }); return; }
+  if (e.key === 'Tab' && !input.value && state.suggestion && !state.streaming) { e.preventDefault(); post({ t: 'acceptSuggestion' }); return; }
   if (e.key === 'Escape' && state.streaming) { e.preventDefault(); post({ t: 'stop' }); return; }
   if (e.key === 'ArrowUp' && !input.value.slice(0, input.selectionStart).includes('\n') && input.selectionStart === input.selectionEnd) {
     const h = history.previous(input.value);
