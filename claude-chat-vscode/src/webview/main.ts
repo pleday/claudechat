@@ -43,7 +43,9 @@ const ctx = (): RenderCtx => ({
 // ---------- Transcript ----------
 
 const nearBottom = () => transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 80;
-const scrollBottom = () => { transcript.scrollTop = transcript.scrollHeight; };
+const scrollBottom = () => { transcript.scrollTop = transcript.scrollHeight; updateToBottom(); };
+/** Pastille « Aller en bas » : visible quand on est remonté ; un clic revient en bas, et la conversation est de nouveau suivie. */
+function updateToBottom(): void { $('toBottom').hidden = nearBottom(); }
 
 function nodeFor(i: number): HTMLElement {
   return renderEntry(entries[i], entries[i].kind === 'text' && startsResponse(entries, i), ctx());
@@ -84,7 +86,7 @@ function addEntry(e: Entry): void {
   nodes.push(n);
   transcript.append(n);
   if (e.kind === 'user') { stickyOpen = false; updateSticky(); }
-  if (stick) scrollBottom();
+  if (stick) scrollBottom(); else updateToBottom();
 }
 
 function patchEntry(i: number, patch: Partial<Entry>): void {
@@ -97,7 +99,7 @@ function patchEntry(i: number, patch: Partial<Entry>): void {
   const n = nodeFor(i);
   nodes[i].replaceWith(n);
   nodes[i] = n;
-  if (stick) scrollBottom();
+  if (stick) scrollBottom(); else updateToBottom();
 }
 
 // Pendant une réponse longue, le rendu Markdown complet est regroupé sur une image d'animation.
@@ -589,6 +591,8 @@ on('searchClose', () => toggleSearch());
 document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); toggleSearch(); } });
 
 // liens : fichiers du projet (ouverts par l'extension) ; les liens http s'ouvrent via le navigateur
+transcript.addEventListener('scroll', updateToBottom);
+$('toBottom').addEventListener('click', scrollBottom);
 transcript.addEventListener('click', (e) => {
   const a = (e.target as HTMLElement).closest('[data-open]') as HTMLElement | null;
   if (a?.dataset.open) { e.preventDefault(); post({ t: 'openFile', spec: a.dataset.open }); }
@@ -639,6 +643,6 @@ window.addEventListener('message', (ev) => {
   }
 });
 
-drawControls(); drawStatus(); drawBattery(); drawHints();
+drawControls(); drawStatus(); drawBattery(); drawHints(); updateToBottom();
 renderAll();
 post({ t: 'ready' });

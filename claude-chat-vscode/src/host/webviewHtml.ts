@@ -41,7 +41,7 @@ export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, a
     <span id="searchCount"></span>
     ${btn('searchPrev', '↑', 'Précédent')}${btn('searchNext', '↓', 'Suivant')}${btn('searchClose', '✕', 'Fermer')}
   </div>
-  <div id="transcript" tabindex="-1"></div>
+  <div id="tw"><div id="transcript" tabindex="-1"></div>${btn('toBottom', '↓ Aller en bas', 'Revenir au dernier message et suivre la conversation', 'pill')}</div>
   <div id="footer">
     <div id="interaction" hidden></div>
     <div id="queue" hidden></div>
