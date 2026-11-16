@@ -165,7 +165,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         add(FlatButton("Aller en bas", AllIcons.General.ArrowDown) { scrollToBottom() }.apply { toolTipText = "Revenir au dernier message et suivre la conversation" }, BorderLayout.CENTER)
     }
     // La conversation remplit le panneau ; la pastille est posée par-dessus, centrée, à 10 px du bas (ajoutée en premier : peinte au-dessus)
-    private val scrollHost = JPanel(object : java.awt.LayoutManager {
+    private val scrollHost = object : JPanel(object : java.awt.LayoutManager {
         override fun addLayoutComponent(name: String?, comp: java.awt.Component?) {}
         override fun removeLayoutComponent(comp: java.awt.Component?) {}
         override fun preferredLayoutSize(parent: java.awt.Container) = scroll.preferredSize
@@ -175,7 +175,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             val d = toBottomPill.preferredSize
             toBottomPill.setBounds((parent.width - d.width) / 2, parent.height - d.height - JBUI.scale(10), d.width, d.height)
         }
-    }).apply {
+    }) {
+        // les enfants se chevauchent : sans ça, Swing repeint la conversation seule (au défilement) par-dessus la pastille
+        override fun isOptimizedDrawingEnabled() = false
+    }.apply {
         add(toBottomPill)
         add(scroll)
     }
@@ -186,6 +189,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     private val transcriptCards = JPanel(java.awt.CardLayout()).apply {
         scroll.verticalScrollBar.addAdjustmentListener { updateToBottomPill() }
+        scroll.viewport.addChangeListener { updateToBottomPill() }
         add(scrollHost, "chat")
         add(JBScrollPane(welcome).apply { border = JBUI.Borders.empty() }, "welcome")
     }
