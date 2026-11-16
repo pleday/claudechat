@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1
+
+- **Suggestion du message suivant** : elle devient le texte par défaut du champ de saisie vide (Tab l'insère) au lieu d'une pastille
+- **Pastille « Aller en bas »** : quand on est remonté dans la conversation, elle ramène au dernier message et réactive le suivi automatique
+- **Détail des quotas** : une jauge colorée (verte, orange dès 60 %, rouge dès 85 %) sous chaque quota montre le pourcentage utilisé
+
 ## 0.9.0
 
 Première version de l'extension VS Code, au niveau fonctionnel du plugin JetBrains 0.9.0.
