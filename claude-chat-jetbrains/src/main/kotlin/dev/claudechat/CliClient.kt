@@ -106,6 +106,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
     @Volatile private var ended = false
     private val refinements = java.util.concurrent.CopyOnWriteArrayList<String>()
     private val stderr = StringBuffer()
+    @Volatile private var errThread: Thread? = null
     @Volatile private var lastActivity = System.nanoTime()
     /** Dernier statut MCP reçu (nom, statut) en réponse à `mcp_status`. */
     @Volatile private var mcpStatus: List<Pair<String, String>>? = null
@@ -131,7 +132,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         }
         proc = p
         out = p.outputStream.bufferedWriter()
-        Thread({ p.errorStream.bufferedReader().forEachLine { stderr.append(it).append('\n') } }, "claude-stderr").apply { isDaemon = true }.start()
+        errThread = Thread({ p.errorStream.bufferedReader().forEachLine { stderr.append(it).append('\n') } }, "claude-stderr").apply { isDaemon = true; start() }
         Thread({ read(p) }, "claude-stdout").apply { isDaemon = true }.start()
         val first = JsonObject().apply {
             addProperty("type", "user")
@@ -243,6 +244,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
             }
         } catch (_: Exception) {}
         p.waitFor(5, TimeUnit.SECONDS)
+        errThread?.join(2000)   // laisse finir la lecture de stderr : son contenu est le message d'erreur
         if (!finished && !killed) {
             val msg = stderr.toString().trim().ifEmpty { "Le processus claude s'est arrêté (code ${runCatching { p.exitValue() }.getOrDefault(-1)})." }
             l.onDone(true, msg)
