@@ -87,6 +87,9 @@ class ChangeTracker(
     /** Oublie tout : les prochaines modifications repartent de l'état du disque à ce moment. */
     fun clear() = synchronized(this) { before.clear(); settled.clear() }
 
+    /** Oublie les [paths] (après un rollback) : ils ne sont plus suivis tant que Claude ne les modifie pas de nouveau. */
+    fun forget(paths: Collection<String>) = synchronized(this) { paths.forEach { before.remove(it); settled.remove(it) } }
+
     /** Fichiers réellement différents de leur état initial (une modification refusée ou annulée n'apparaît pas). */
     fun changes(): List<ChangedFile> {
         val snapshot = synchronized(this) { before.toMap() }

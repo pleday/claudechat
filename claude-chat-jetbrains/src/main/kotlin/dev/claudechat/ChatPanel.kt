@@ -1020,7 +1020,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun showChangedFiles() {
         val files = changedFiles
         if (files.isEmpty()) return
-        ChangedFilesView.show(project, files) { clearChangedFiles() }
+        ChangedFilesView.show(project, files) { rolledBack ->
+            changeTracker.forget(rolledBack.map { it.path })
+            changeTracker.changes().also { changedFiles = it; updateHints() }
+        }
     }
 
     /** Titre de la conversation proposé par la CLI, sauf si l'utilisateur a renommé l'onglet lui-même. */
