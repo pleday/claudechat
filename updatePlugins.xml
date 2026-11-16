@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.3/claude-chat-0.9.3.zip" version="0.9.3">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.4/claude-chat-0.9.4.zip" version="0.9.4">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Fichiers modifiés par Claude</b> : la fenêtre n'a plus de bouton « Effacer la liste » ; chaque fichier a sa case à cocher (comme la fenêtre « Rollback » d'IntelliJ) et « Rollback » remet les fichiers cochés dans leur état d'avant Claude (les fichiers créés par Claude sont supprimés si la case « Supprimer les fichiers créés par Claude » est cochée). Le bouton est grisé quand rien n'est coché ; « Ouvrir le fichier » ouvre le fichier sélectionné dans l'éditeur</li>
+<li><b>Arrêt de la CLI</b> : quand le processus <code>claude</code> s'arrête sans résultat, le message d'erreur de la CLI (stderr) est maintenant toujours affiché, au lieu d'un message générique si sa lecture n'était pas terminée</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
