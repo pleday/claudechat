@@ -7,7 +7,7 @@ import { Mentions, PERMISSION_MODES, queuePreview, SlashToken } from '../core/te
 import type { HostMsg, UiState, UsageReport, WebMsg } from '../protocol';
 import { applyKnownFiles, el, renderEntry, startsResponse, type RenderCtx } from './render';
 
-declare function acquireVsCodeApi(): { postMessage(m: WebMsg): void };
+declare function acquireVsCodeApi(): { postMessage(m: WebMsg): void; getState?(): unknown; setState?(s: unknown): void };
 declare global { interface Window { __CCG: { avatar: string } } }
 
 const vscode = acquireVsCodeApi();
@@ -421,10 +421,33 @@ function drawInteraction(): void {
 
 // ---------- Saisie : envoi, historique, complétion ----------
 
+// Hauteur minimale choisie par l'utilisateur en tirant la poignée (0 : celle par défaut) ; la zone grandit au-delà avec le texte.
+const DEFAULT_MAX_INPUT = 220;
+let inputMin = ((vscode.getState?.() as { inputMin?: number } | undefined)?.inputMin) ?? 0;
+const maxInput = () => Math.max(DEFAULT_MAX_INPUT, Math.floor(window.innerHeight * 0.6));
+
 function autosize(): void {
   input.style.height = 'auto';
-  input.style.height = `${Math.min(input.scrollHeight, 220)}px`;
+  input.style.height = `${Math.min(Math.max(input.scrollHeight, inputMin), maxInput())}px`;
 }
+
+(() => {
+  const grip = document.getElementById('grip');
+  if (!grip) return;
+  grip.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const y0 = e.clientY; const h0 = input.offsetHeight;
+    grip.classList.add('drag');
+    const move = (m: MouseEvent) => { inputMin = Math.max(0, Math.min(h0 + (y0 - m.clientY), maxInput())); autosize(); };
+    const up = () => {
+      grip.classList.remove('drag');
+      document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+      try { vscode.setState?.({ ...((vscode.getState?.() as object) ?? {}), inputMin }); } catch { /* état non disponible */ }
+    };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  });
+  grip.addEventListener('dblclick', () => { inputMin = 0; autosize(); try { vscode.setState?.({ ...((vscode.getState?.() as object) ?? {}), inputMin: 0 }); } catch { /* idem */ } });
+})();
 
 function send(mode?: 'refine' | 'queue'): void {
   const text = input.value.trim();

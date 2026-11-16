@@ -105,7 +105,10 @@ input:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 #card { position: relative; border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #8886)); border-radius: 8px; background: var(--vscode-input-background); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
 #card:focus-within { border-color: var(--accent); }
-#input { resize: none; border: none; background: transparent; padding: 2px 4px; max-height: 220px; width: 100%; }
+#input { resize: none; border: none; background: transparent; padding: 2px 4px; width: 100%; }
+#grip { position: absolute; top: -3px; left: 0; right: 0; height: 8px; cursor: ns-resize; z-index: 2; }
+#grip::after { content: ''; position: absolute; left: 50%; top: 3px; width: 28px; height: 2px; margin-left: -14px; border-radius: 1px; background: var(--vscode-descriptionForeground); opacity: 0; transition: opacity .15s; }
+#grip:hover::after, #grip.drag::after { opacity: .6; }
 #input:focus { outline: none; }
 #controls { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .grow { flex: 1 1 0; min-width: 2px; }

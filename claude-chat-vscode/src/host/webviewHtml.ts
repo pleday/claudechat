@@ -49,7 +49,8 @@ export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, a
     <div id="statusrow"><span id="hourglass" hidden>⏳</span><span id="status"></span><span id="usage"></span><span id="ring" title="Contexte"></span>${btn('battery', '', 'Quota', 'fb')}</div>
     <div id="card">
       <div id="completion" hidden></div>
-      <textarea id="input" rows="1" placeholder="Demande à Claude…   @ fichier · / commande" spellcheck="false"></textarea>
+      <div id="grip" title="Glisser pour agrandir ou réduire la zone de saisie (double-clic : taille par défaut)"></div>
+      <textarea id="input" rows="3" placeholder="Demande à Claude…   @ fichier · / commande" spellcheck="false"></textarea>
       <div id="controls">
         ${btn('plus', '+', 'Joindre, mentionner, commandes', 'fb')}
         ${btn('modeBtn', '', 'Mode de permission', 'fb')}
