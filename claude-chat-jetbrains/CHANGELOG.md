@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+
+- **Zone de saisie** : la pastille « fichiers modifiés » sort de la carte de saisie et se place au-dessus ; la suggestion du message suivant devient le texte par défaut du champ vide (Tab ou Ctrl+Tab l'insère), ce qui évite la mise en page bancale quand on colle une image
+
 ## 0.9.1
 
 - **Message épinglé** : une fois déplié, sa première ligne n'apparaît plus deux fois (le libellé affiche « Votre message », le texte complet est en dessous)

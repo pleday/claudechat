@@ -210,7 +210,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         lineWrap = true
         wrapStyleWord = true
-        emptyText.setText("@ pour les fichiers, / pour les commandes, Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne")
+        emptyText.setText(DEFAULT_PLACEHOLDER)
         inputMap.put(KeyStroke.getKeyStroke("ENTER"), "claude-send")
         actionMap.put("claude-send", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept")) send() }
@@ -218,6 +218,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         inputMap.put(KeyStroke.getKeyStroke("TAB"), "claude-complete")
         actionMap.put("claude-complete", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept") && !acceptSuggestion()) transferFocus() }
+        })
+        inputMap.put(KeyStroke.getKeyStroke("ctrl TAB"), "claude-suggest")
+        actionMap.put("claude-suggest", object : AbstractAction() {
+            override fun actionPerformed(e: ActionEvent?) { acceptSuggestion() }
         })
         for ((key, dir, base) in listOf(Triple("UP", "up", "caret-up"), Triple("DOWN", "down", "caret-down"))) {
             val original = actionMap.get(base)
@@ -287,13 +291,16 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun colorHex(c: java.awt.Color) = "#%02x%02x%02x".format(c.red, c.green, c.blue)
 
     /**
-     * Reconstruit les pastilles du haut de la saisie, seulement si leur contenu a changé. La suggestion n'est montrée que
-     * quand Claude a fini et que le champ est vide (sinon elle gênerait la frappe) ; les fichiers modifiés restent visibles.
+     * Met à jour la pastille « fichiers modifiés » (au-dessus de la carte de saisie, donc hors du champ : les images collées
+     * ne la bousculent plus) et le texte par défaut du champ : la suggestion de la suite, quand Claude a fini.
      */
     private fun updateHints() {
         val files = changedFiles
-        val sugg = suggestion?.takeIf { !streaming && input.text.isBlank() }
-        val key = (if (files.isEmpty()) "" else "${files.size}|${files.sumOf { it.added }}|${files.sumOf { it.removed }}") + "#" + (sugg ?: "")
+        val sugg = suggestion?.takeIf { !streaming }
+        val placeholder = if (sugg == null) DEFAULT_PLACEHOLDER else
+            "💡 " + sugg.replace(Regex("\\s+"), " ").let { if (it.length > 90) it.take(89) + "…" else it } + "  (Tab ou Ctrl+Tab pour l'insérer)"
+        if (input.emptyText.text != placeholder) { input.emptyText.setText(placeholder); input.repaint() }
+        val key = if (files.isEmpty()) "" else "${files.size}|${files.sumOf { it.added }}|${files.sumOf { it.removed }}"
         if (key == hintsKey) return
         hintsKey = key
         hintsStrip.removeAll()
@@ -303,12 +310,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
                 "<font color='${colorHex(ADDED)}'>+${files.sumOf { it.added }}</font> <font color='${colorHex(REMOVED)}'>−${files.sumOf { it.removed }}</font></html>"
             hintsStrip.add(chip(AllIcons.Actions.Diff, text, ChangedFilesView.summary(files) + " — cliquer pour comparer avec l'état avant Claude",
                 { showChangedFiles() }, "Oublier ces modifications") { clearChangedFiles() })
-        }
-        if (sugg != null) {
-            val shown = sugg.replace(Regex("\\s+"), " ").let { if (it.length > 70) it.take(69) + "…" else it }
-            val text = "<html>${esc(shown)}&nbsp; <font color='${colorHex(UIUtil.getContextHelpForeground())}'>Tab</font></html>"
-            hintsStrip.add(chip(AllIcons.Actions.IntentionBulb, text, "Suggestion de la suite : $sugg (clic ou Tab dans le champ vide)",
-                { acceptSuggestion() }, "Ignorer la suggestion") { setSuggestion(null) })
         }
         hintsStrip.isVisible = hintsStrip.componentCount > 0
         hintsStrip.revalidate(); hintsStrip.repaint()
@@ -362,15 +363,14 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private val commandStarts = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val pendingScan = java.util.concurrent.atomic.AtomicReference<Pair<Long, Long>?>(null)
     @Volatile private var changedFiles: List<ChangedFile> = emptyList()
-    // Pastilles contextuelles au-dessus du champ de saisie, sur une seule rangée alignée à gauche : fichiers modifiés par Claude
-    // et suggestion du message suivant (voir updateHints). Même style que les pièces jointes.
+    // Pastille des fichiers modifiés par Claude, au-dessus de la carte de saisie (voir updateHints). Même style que les pièces jointes.
     private val hintsStrip = JPanel(WrapFlowLayout(FlowLayout.LEFT, 4, 2)).apply {
         isOpaque = false; isVisible = false; alignmentX = java.awt.Component.LEFT_ALIGNMENT
     }
     private var hintsKey = ""
     private val changesTask = Runnable { refreshChangedFiles() }
 
-    // Suggestion du message suivant proposée par la CLI (--prompt-suggestions) : un clic, ou Tab dans le champ vide, l'insère
+    // Suggestion du message suivant proposée par la CLI (--prompt-suggestions) : affichée comme texte par défaut du champ ; Tab ou Ctrl+Tab l'insère
     private var suggestion: String? = null
     // Modèle, effort et permissions : état + boutons plats (menus au-dessus de la carte de saisie)
     private var selectedModel = ModelCatalog.resolve(settings.state.model)
@@ -585,10 +585,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val topRows = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
-            add(extrasRow); add(queueRow); add(hintsStrip)
+            add(extrasRow); add(queueRow)
         }
         val bottom = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(2, 6, 6, 6)
+            add(hintsStrip, BorderLayout.NORTH)
             add(composerCard(inputScroll, topRows, input, listOf(plusButton, modeButton, contextChip), listOf(modelButton, ring, sendControl)), BorderLayout.CENTER)
         }
         val splitter = JBSplitter(true, 0.78f).apply {
@@ -1969,6 +1970,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val USER_BG = JBColor(Color(0xE8F0FE), Color(0x2D3748))
         val USER_ACCENT = JBColor(Color(0x2F6FDE), Color(0x6EA8FE))
 
+        const val DEFAULT_PLACEHOLDER = "@ pour les fichiers, / pour les commandes, Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne"
         val MAX_RESUMES = Constants.maxAutoResumes
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ChatPanel::class.java)
         /** Dossiers générés ou internes : jamais parcourus pour retrouver les changements d'une commande. */
