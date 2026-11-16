@@ -234,6 +234,12 @@ function showUsage(r: UsageReport): void {
     for (const l of [r.five, r.week]) {
       box.append(el('b', undefined, l.title));
       box.append(el('div', undefined, l.used === null ? 'pas encore mesuré' : `${l.used} % utilisé · ${100 - l.used} % restant`));
+      if (l.used !== null) {
+        const bar = el('div', 'qbar'), fill = el('div', `qfill ${l.used >= 85 ? 'hi' : l.used >= 60 ? 'mid' : 'lo'}`);
+        fill.style.width = `${Math.min(100, Math.max(0, l.used))}%`;
+        bar.append(fill);
+        box.append(bar);
+      }
       box.append(el('div', 'dim', l.reset));
     }
     box.append(el('b', undefined, 'Cette conversation'));

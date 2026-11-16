@@ -145,3 +145,9 @@ button[hidden], [hidden] { display: none !important; }
 
 /* vue étroite : la pastille du fichier courant ne garde que son icône (le nom est dans l'info-bulle) */
 @media (max-width: 480px) { .fb.ctx .lbl { display: none; } }
+
+.qbar { height: 8px; margin: 3px 0; border-radius: 4px; background: var(--vscode-input-background); overflow: hidden; }
+.qfill { height: 100%; border-radius: 4px; min-width: 8px; }
+.qfill.lo { background: var(--vscode-charts-green, #3fb950); }
+.qfill.mid { background: var(--vscode-charts-orange, #d18616); }
+.qfill.hi { background: var(--vscode-charts-red, #f14c4c); }
