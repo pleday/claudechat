@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.4
+
+- **Arrêt de la CLI** : quand le processus `claude` s'arrête sans résultat, le message d'erreur de la CLI (stderr) est maintenant toujours affiché, au lieu d'un message générique si sa lecture n'était pas terminée
+
 ## 0.9.3
 
 - **Fichiers modifiés par Claude** : la fenêtre n'a plus de bouton « Effacer la liste » ; chaque fichier a sa case à cocher (comme la fenêtre « Rollback » d'IntelliJ) et « Rollback » remet les fichiers cochés dans leur état d'avant Claude (les fichiers créés par Claude sont supprimés si la case « Supprimer les fichiers créés par Claude » est cochée). Le bouton est grisé quand rien n'est coché ; « Ouvrir le fichier » ouvre le fichier sélectionné dans l'éditeur
