@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.4
+
+- **Zone de saisie** : plus haute par défaut (3 lignes) et redimensionnable : poignée au bord haut de la carte (glisser pour agrandir ou réduire, double-clic pour revenir à la taille par défaut), hauteur mémorisée
+- **Interface harmonisée** : barre d'outils en icônes SVG regroupées (conversation, affichage, automatismes), puces de contrôle de hauteur uniforme, icônes cohérentes pour l'envoi, l'arrêt, le fichier courant, la batterie et l'attente, carte de saisie plus aérée
+
 ## 0.9.3
 
 - **Fichiers modifiés par Claude** : moins de bruit. Les fichiers écrits dans un dossier temporaire (`/tmp`, scratchpad de Claude), dans `.claude/worktrees` ou dans un dossier généré (`build`, `node_modules`…) ne sont plus listés, et les worktrees ne sont plus parcourus par la détection des changements faits par les commandes
