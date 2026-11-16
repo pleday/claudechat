@@ -1,6 +1,6 @@
 # Changelog
 
-## Non publié
+## 0.9.2
 
 - **Images dans la conversation** : un chemin d'image existant cité par Claude (texte, code en ligne, carte d'outil comme `Read`) s'affiche en miniature (160 × 110 px au plus, jamais agrandie) au lieu d'un lien ; un clic l'ouvre. Les images que vous joignez apparaissent aussi en petites miniatures (110 × 80 px, 6 au plus, sur une ligne) dans votre message, y compris à la reprise d'une session
 - **Utilisation de Claude** : une jauge colorée (verte, orange dès 60 %, rouge dès 85 %) sous chaque quota (session de 5 h, semaine) montre d'un coup d'œil le pourcentage utilisé
