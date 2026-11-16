@@ -246,6 +246,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         lineWrap = true
         wrapStyleWord = true
         emptyText.setText(DEFAULT_PLACEHOLDER)
+        // par défaut le texte par défaut disparaît dès que le champ a le focus : la suggestion doit rester visible tant qu'il est vide
+        putClientProperty("StatusVisibleFunction", java.util.function.Predicate<javax.swing.text.JTextComponent> { it.text.isNullOrEmpty() })
         inputMap.put(KeyStroke.getKeyStroke("ENTER"), "claude-send")
         actionMap.put("claude-send", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept")) send() }
@@ -253,10 +255,6 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         inputMap.put(KeyStroke.getKeyStroke("TAB"), "claude-complete")
         actionMap.put("claude-complete", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent?) { if (!completionKey("accept") && !acceptSuggestion()) transferFocus() }
-        })
-        inputMap.put(KeyStroke.getKeyStroke("ctrl TAB"), "claude-suggest")
-        actionMap.put("claude-suggest", object : AbstractAction() {
-            override fun actionPerformed(e: ActionEvent?) { acceptSuggestion() }
         })
         for ((key, dir, base) in listOf(Triple("UP", "up", "caret-up"), Triple("DOWN", "down", "caret-down"))) {
             val original = actionMap.get(base)
@@ -333,7 +331,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val files = changedFiles
         val sugg = suggestion?.takeIf { !streaming }
         val placeholder = if (sugg == null) DEFAULT_PLACEHOLDER else
-            "💡 " + sugg.replace(Regex("\\s+"), " ").let { if (it.length > 90) it.take(89) + "…" else it } + "  (Tab ou Ctrl+Tab pour l'insérer)"
+            "💡 " + sugg.replace(Regex("\\s+"), " ").let { if (it.length > 90) it.take(89) + "…" else it } + "  (Tab pour l'insérer)"
         if (input.emptyText.text != placeholder) { input.emptyText.setText(placeholder); input.repaint() }
         val key = if (files.isEmpty()) "" else "${files.size}|${files.sumOf { it.added }}|${files.sumOf { it.removed }}"
         if (key == hintsKey) return
@@ -405,7 +403,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var hintsKey = ""
     private val changesTask = Runnable { refreshChangedFiles() }
 
-    // Suggestion du message suivant proposée par la CLI (--prompt-suggestions) : affichée comme texte par défaut du champ ; Tab ou Ctrl+Tab l'insère
+    // Suggestion du message suivant proposée par la CLI (--prompt-suggestions) : affichée comme texte par défaut du champ ; Tab l'insère
     private var suggestion: String? = null
     // Modèle, effort et permissions : état + boutons plats (menus au-dessus de la carte de saisie)
     private var selectedModel = ModelCatalog.resolve(settings.state.model)

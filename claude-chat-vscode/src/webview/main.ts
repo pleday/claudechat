@@ -314,7 +314,7 @@ function drawSend(): void {
 
 const DEFAULT_PLACEHOLDER = 'Demande à Claude…   @ fichier · / commande';
 
-/** La suggestion de la suite est le texte par défaut du champ (Tab, ou Ctrl+Tab, l'insère). */
+/** La suggestion de la suite est le texte par défaut du champ (Tab l'insère). */
 function drawPlaceholder(): void {
   const s = state.suggestion && !state.streaming ? state.suggestion.replace(/\s+/g, ' ') : '';
   input.placeholder = s ? `💡 ${s.length > 90 ? `${s.slice(0, 89)}…` : s}  (Tab pour l'insérer)` : DEFAULT_PLACEHOLDER;

@@ -22,7 +22,7 @@ clair **et** en thème sombre. Garder `build/idea-sandbox/IC-2024.3/log/idea.log
 - [ ] Fin de réponse : la barre de statut affiche « … · réponse en X s » et plus « Réponse en cours ».
 - [ ] Le titre de l'onglet passe du début du message à un titre généré, quelques secondes après la réponse.
 - [ ] En remontant dans une longue conversation, la pastille « Aller en bas » apparaît ; un clic revient au dernier message et la conversation est de nouveau suivie.
-- [ ] Une réponse qui appelle une suite affiche la suggestion comme texte par défaut du champ vide ; Tab ou Ctrl+Tab l'insère. Les fichiers modifiés restent en pastille au-dessus de la carte de saisie, même avec une image collée.
+- [ ] Une réponse qui appelle une suite affiche la suggestion comme texte par défaut du champ vide ; Tab l'insère, et elle reste visible quand le champ a le focus. Les fichiers modifiés restent en pastille au-dessus de la carte de saisie, même avec une image collée.
 
 ## D. Contrôles
 - [ ] Changer le mode de permission **pendant** une réponse : l'effet est immédiat (sauf « Tout autoriser » : avis).
