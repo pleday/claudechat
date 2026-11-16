@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.2/claude-chat-0.9.2.zip" version="0.9.2">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.3/claude-chat-0.9.3.zip" version="0.9.3">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Images dans la conversation</b> : un chemin d'image existant cité par Claude (texte, code en ligne, carte d'outil comme <code>Read</code>) s'affiche en miniature (160 × 110 px au plus, jamais agrandie) au lieu d'un lien ; un clic l'ouvre. Les images que vous joignez apparaissent aussi en petites miniatures (110 × 80 px, 6 au plus, sur une ligne) dans votre message, y compris à la reprise d'une session</li>
-<li><b>Utilisation de Claude</b> : une jauge colorée (verte, orange dès 60 %, rouge dès 85 %) sous chaque quota (session de 5 h, semaine) montre d'un coup d'œil le pourcentage utilisé</li>
-<li><b>Pastille « Aller en bas »</b> : quand on est remonté dans la conversation, une pastille flottante ramène au dernier message et réactive le suivi automatique</li>
-<li><b>Zone de saisie</b> : la pastille « fichiers modifiés » sort de la carte de saisie et se place au-dessus ; la suggestion du message suivant devient le texte par défaut du champ vide (Tab l'insère, et elle reste visible quand le champ a le focus), ce qui évite la mise en page bancale quand on colle une image</li>
+<li><b>Fichiers modifiés par Claude</b> : la fenêtre n'a plus de bouton « Effacer la liste » ; chaque fichier a sa case à cocher (comme la fenêtre « Rollback » d'IntelliJ) et « Rollback » remet les fichiers cochés dans leur état d'avant Claude (les fichiers créés par Claude sont supprimés si la case « Supprimer les fichiers créés par Claude » est cochée). Le bouton est grisé quand rien n'est coché ; « Ouvrir le fichier » ouvre le fichier sélectionné dans l'éditeur</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
