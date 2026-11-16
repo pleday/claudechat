@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- **Pastille « Aller en bas »** : quand on est remonté dans la conversation, une pastille flottante ramène au dernier message et réactive le suivi automatique
 - **Zone de saisie** : la pastille « fichiers modifiés » sort de la carte de saisie et se place au-dessus ; la suggestion du message suivant devient le texte par défaut du champ vide (Tab ou Ctrl+Tab l'insère), ce qui évite la mise en page bancale quand on colle une image
 
 ## 0.9.1

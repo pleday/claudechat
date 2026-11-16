@@ -147,8 +147,43 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     private val scroll = JBScrollPane(view)
     private val welcome = WelcomePanel(Avatar.load())
+    // Pastille flottante en bas de la conversation : visible quand on est remonté, un clic revient tout en bas
+    // (et la conversation est de nouveau suivie automatiquement, voir render)
+    private val toBottomPill = object : JPanel(BorderLayout()) {
+        override fun paintComponent(g: java.awt.Graphics) {
+            val g2 = g.create() as java.awt.Graphics2D
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+            g2.color = UIUtil.getPanelBackground()
+            g2.fillRoundRect(0, 0, width - 1, height - 1, height, height)
+            g2.color = JBColor.border()
+            g2.drawRoundRect(0, 0, width - 1, height - 1, height, height)
+            g2.dispose()
+        }
+    }.apply {
+        isOpaque = false; isVisible = false
+        alignmentX = 0.5f; alignmentY = 1f
+        border = JBUI.Borders.empty(2, 4)
+        add(FlatButton("Aller en bas", AllIcons.General.ArrowDown) { scrollToBottom() }.apply { toolTipText = "Revenir au dernier message et suivre la conversation" }, BorderLayout.CENTER)
+        maximumSize = preferredSize
+    }
+    private val scrollHost = JPanel().apply {
+        layout = javax.swing.OverlayLayout(this)
+        add(JPanel(BorderLayout()).apply {
+            isOpaque = false; alignmentX = 0.5f; alignmentY = 1f
+            border = JBUI.Borders.emptyBottom(10)
+            add(toBottomPill, BorderLayout.CENTER)
+            maximumSize = java.awt.Dimension(preferredSize.width, preferredSize.height)
+        })
+        add(scroll)
+    }
+    private fun scrollToBottom() { val b = scroll.verticalScrollBar; b.value = b.maximum; updateToBottomPill() }
+    private fun updateToBottomPill() {
+        val b = scroll.verticalScrollBar
+        toBottomPill.isVisible = b.value + b.visibleAmount < b.maximum - 40
+    }
     private val transcriptCards = JPanel(java.awt.CardLayout()).apply {
-        add(scroll, "chat")
+        scroll.verticalScrollBar.addAdjustmentListener { updateToBottomPill() }
+        add(scrollHost, "chat")
         add(JBScrollPane(welcome).apply { border = JBUI.Borders.empty() }, "welcome")
     }
     // Message de l'utilisateur épinglé en haut de la conversation : une ligne discrète, dépliable d'un clic (voir StickyPrompt)
@@ -1908,7 +1943,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         val html = Highlight.apply(built.html, searchQuery)
         if (html != lastHtml) { view.text = html; lastHtml = html }
         // FR-08 : ne pas faire sauter le défilement si l'utilisateur est remonté.
-        SwingUtilities.invokeLater { bar.value = if (atBottom) bar.maximum else oldValue }
+        SwingUtilities.invokeLater { bar.value = if (atBottom) bar.maximum else oldValue; updateToBottomPill() }
     }
 
     /** Épingle le dernier message de l'utilisateur, ou le précédent si le dernier ne fait que demander de reprendre. */
