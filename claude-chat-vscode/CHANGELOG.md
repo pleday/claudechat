@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.6
+
+- **`/mcp reconnect|enable|disable <serveur>`** : fonctionne enfin (la CLI refusait ces actions comme commande hors terminal). Le plugin utilise les requêtes de contrôle équivalentes : activer ou désactiver un serveur est mémorisé par la CLI pour le projet et pris en compte dès le prochain message ; une erreur (serveur inconnu…) s'affiche dans la conversation
+
 ## 0.9.5
 
 - **Commandes `/` de la CLI** : la réponse des commandes locales (`/context`, `/cost`, `/usage`, `/help`…) s'affiche enfin dans la conversation ; elle était perdue, d'où l'impression que « rien ne se passe »
