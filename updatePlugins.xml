@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.7/claude-chat-0.9.7.zip" version="0.9.7">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.8/claude-chat-0.9.8.zip" version="0.9.8">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b><code>/mcp reconnect|enable|disable &lt;serveur&gt;</code></b> : fonctionne enfin (la CLI refusait ces actions comme commande hors terminal). Le plugin utilise les requêtes de contrôle équivalentes : activer ou désactiver un serveur est mémorisé par la CLI pour le projet et pris en compte dès le prochain message ; une erreur (serveur inconnu…) s'affiche dans la conversation</li>
+<li><b>Lien vers une conversation</b> : <code>jetbrains://&lt;produit&gt;/claude-chat/&lt;session&gt;[?cwd=&lt;dossier&gt;]</code> (par exemple <code>idea jetbrains://idea/claude-chat/&lt;session&gt;</code>) sélectionne l'onglet qui porte cette session, ou la charge dans un nouvel onglet si elle n'est pas ouverte, et ramène la fenêtre du projet au premier plan. Sert aux outils externes qui veulent montrer une conversation précise</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
