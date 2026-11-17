@@ -8,6 +8,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="Claude Chat" displayType="BALLOON"/>
+        <jbProtocolCommand implementation="dev.claudechat.OpenSessionCommand"/>
         <toolWindow id="Claude Chat" anchor="right" icon="/icons/claude.svg" canCloseContents="true"
                     factoryClass="dev.claudechat.ChatToolWindowFactory"/>
         <applicationConfigurable parentId="tools" id="dev.claudechat.settings"

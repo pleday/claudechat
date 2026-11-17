@@ -76,6 +76,8 @@ import javax.swing.event.HyperlinkEvent
 class ChatPanel(private val project: Project, parent: Disposable) : JPanel(BorderLayout()) {
     private val settings = ClaudeSettings.get()
     private var session = Session()
+    /** Identifiant de la session de la CLI portée par cet onglet (absent tant que la conversation n'a pas démarré). */
+    val sessionId: String? get() = session.id
     private var streaming = false
     private var generation = 0
     private var renderPending = false

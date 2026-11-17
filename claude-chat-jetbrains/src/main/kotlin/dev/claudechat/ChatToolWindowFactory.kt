@@ -58,6 +58,21 @@ class ChatToolWindowFactory : ToolWindowFactory, DumbAware {
             tw.show { addTab(project, tw).also { p -> session?.let(p::loadSession) } }
         }
 
+        /** Onglet qui porte la session [id], s'il est ouvert. */
+        private fun findTab(project: Project, id: String): com.intellij.ui.content.Content? =
+            ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.contents
+                ?.firstOrNull { (it.component as? ChatPanel)?.sessionId == id }
+
+        fun hasTab(project: Project, id: String): Boolean = findTab(project, id) != null
+
+        /** Montre et sélectionne l'onglet de la session [id] ; false s'il n'est pas ouvert. */
+        fun selectTab(project: Project, id: String): Boolean {
+            val tw = ToolWindowManager.getInstance(project).getToolWindow(ID) ?: return false
+            val tab = findTab(project, id) ?: return false
+            tw.show { tw.contentManager.setSelectedContent(tab, true) }
+            return true
+        }
+
         /** Panneau de l'onglet sélectionné ; en crée un si tous les onglets ont été fermés. */
         fun ensurePanel(project: Project, tw: ToolWindow): ChatPanel =
             tw.contentManager.selectedContent?.component as? ChatPanel ?: addTab(project, tw)
