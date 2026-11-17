@@ -405,7 +405,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
             val p = ProcessBuilder(cmd).directory(java.io.File(cwd)).start()
             p.outputStream.bufferedWriter().use { it.write("ok") }
             val err = StringBuffer()
-            Thread { p.errorStream.bufferedReader().forEachLine { err.append(it).append('\n') } }.apply { isDaemon = true }.start()
+            val errReader = Thread { p.errorStream.bufferedReader().forEachLine { err.append(it).append('\n') } }.apply { isDaemon = true; start() }
             var limits: RateLimits? = null
             val reader = Thread {
                 p.inputStream.bufferedReader().forEachLine { line ->
@@ -416,7 +416,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
             reader.join(timeoutSec * 1000)
             if (reader.isAlive) { p.destroy(); ProbeResult(limits, "délai dépassé") }
             else limits?.let { ProbeResult(it, null) }
-                ?: ProbeResult(null, err.toString().trim().ifEmpty { "la CLI n'a fourni aucune information de quota (compte API, proxy ou version sans cette donnée ?)" })
+                ?: ProbeResult(null, errReader.also { it.join(2000) }.let { err.toString() }.trim().ifEmpty { "la CLI n'a fourni aucune information de quota (compte API, proxy ou version sans cette donnée ?)" })
         } catch (e: Exception) { ProbeResult(null, "impossible de lancer la CLI : ${e.message}") }
 
         /** Suggestion exploitable : une ligne, sans espaces superflus, bornée ; null si vide. */
