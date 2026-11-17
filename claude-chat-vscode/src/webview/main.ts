@@ -520,7 +520,11 @@ function onInputChange(): void {
   if (slash !== undefined) {
     completionAnchor = 0;
     const rowsList: Row[] = [];
-    for (const [cat, list] of SlashCatalog.group(slash, state.slash)) {
+    const groups = SlashCatalog.group(slash, state.slash);
+    // commande déjà saisie en entier : inutile de la reproposer (Entrée doit envoyer, pas compléter)
+    const only = groups.length === 1 && groups[0][1].length === 1 ? groups[0][1][0] : undefined;
+    if (only && only.name.toLowerCase() === slash.toLowerCase()) { hideCompletion(); return; }
+    for (const [cat, list] of groups) {
       rowsList.push({ text: cat, value: '', header: true });
       list.forEach((e) => rowsList.push({ text: `/${e.name}`, value: e.name, desc: e.description }));
     }

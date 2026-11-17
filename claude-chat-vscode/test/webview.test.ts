@@ -137,6 +137,14 @@ describe('interface du webview', () => {
     input.value = '';
   });
 
+  it('complétion « / » : une commande tapée en entier n\'est pas reproposée (Entrée envoie)', () => {
+    const input = $('input') as HTMLTextAreaElement;
+    input.value = '/compact'; input.setSelectionRange(8, 8);
+    input.dispatchEvent(new Event('input'));
+    expect($('completion').hidden).toBe(true);
+    input.value = '';
+  });
+
   it('complétion « @ » : interroge l\'extension et insère le fichier choisi', () => {
     sent.length = 0;
     const input = $('input') as HTMLTextAreaElement;
