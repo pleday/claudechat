@@ -292,3 +292,15 @@ fun busyWarning(streaming: Boolean, queued: Int, consequence: String): String? {
     val lost = when (queued) { 0 -> ""; 1 -> "\n\n1 message en attente sera perdu."; else -> "\n\n$queued messages en attente seront perdus." }
     return "Claude est en train de répondre. $consequence$lost"
 }
+
+private val AUTO_DENIAL = Regex("""^Permission to use (\S+)(?: with [\s\S]*)? has been denied\.?$""")
+
+/**
+ * Refus automatique de la CLI (règle `deny` des réglages, mode « Sans demande »…) : elle répond « Permission to use X … has been denied. »
+ * sans rien demander. On l'explique, pour qu'on ne croie pas qu'une validation a été perdue. Autre texte : inchangé.
+ */
+fun explainAutoDenial(text: String, isError: Boolean): String {
+    val m = if (isError) AUTO_DENIAL.find(text.trim()) else null
+    return if (m == null) text
+    else "Refusé automatiquement par la CLI, sans rien vous demander : une règle « deny » des réglages (.claude/settings*.json) ou le mode « Sans demande » interdit l'outil ${m.groupValues[1]}."
+}

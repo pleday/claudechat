@@ -223,3 +223,13 @@ export function busyWarning(streaming: boolean, queued: number, consequence: str
   const lost = queued === 0 ? '' : queued === 1 ? '\n\n1 message en attente sera perdu.' : `\n\n${queued} messages en attente seront perdus.`;
   return `Claude est en train de répondre. ${consequence}${lost}`;
 }
+
+/**
+ * Refus automatique de la CLI (règle `deny` des réglages, mode « Sans demande »…) : elle répond « Permission to use X … has been denied. »
+ * sans rien demander. On l'explique, pour qu'on ne croie pas qu'une validation a été perdue. Autre texte : inchangé.
+ */
+export function explainAutoDenial(text: string, isError: boolean): string {
+  const m = isError ? /^Permission to use (\S+)(?: with [\s\S]*)? has been denied\.?$/.exec(text.trim()) : null;
+  if (!m) return text;
+  return `Refusé automatiquement par la CLI, sans rien vous demander : une règle « deny » des réglages (.claude/settings*.json) ou le mode « Sans demande » interdit l'outil ${m[1]}.`;
+}

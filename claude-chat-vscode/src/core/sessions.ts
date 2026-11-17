@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Json } from './cli';
+import { explainAutoDenial } from './textTools';
 
 export type Kind = 'user' | 'text' | 'thinking' | 'tool' | 'notice' | 'error';
 
@@ -190,7 +191,7 @@ export async function loadSession(info: SessionInfo): Promise<Session> {
       if (Array.isArray(c)) for (const b of c) {
         if (b?.type === 'tool_result') {
           const e = tools.get(b.tool_use_id);
-          if (e) { e.result = resultText(b.content); e.isError = b.is_error === true; }
+          if (e) { e.isError = b.is_error === true; e.result = explainAutoDenial(resultText(b.content), e.isError); }
         }
       }
     } else if (o.type === 'assistant' && Array.isArray(o.message?.content)) {

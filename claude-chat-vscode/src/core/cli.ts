@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline';
 import { parseContextUsage, parseCommands, parseModels, controlPayload, type CliCommand, type CliModel, type ContextUsage } from './cliInfo';
 import { LIMITS, QUOTA_PROBE_MODEL } from './constants';
 import { resultText } from './sessions';
+import { explainAutoDenial } from './textTools';
 
 export type Json = Record<string, any>;
 
@@ -254,7 +255,7 @@ export class CliTurn {
         const c = j.message?.content;
         if (typeof c === 'string') this.consume(c);
         else if (Array.isArray(c)) for (const b of c) {
-          if (b.type === 'tool_result') l.onToolResult?.(b.tool_use_id, resultText(b.content), b.is_error === true);
+          if (b.type === 'tool_result') l.onToolResult?.(b.tool_use_id, explainAutoDenial(resultText(b.content), b.is_error === true), b.is_error === true);
           // la CLI rejoue le message quand elle le prend en compte : la précision est consommée
           else if (b.type === 'text') this.consume(b.text);
         }

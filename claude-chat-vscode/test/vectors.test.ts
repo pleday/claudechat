@@ -13,7 +13,7 @@ import { listSessions, loadSession, paths, projectDir } from '../src/core/sessio
 import { SlashCatalog } from '../src/core/slashCatalog';
 import { isResume, pickSticky } from '../src/core/stickyPrompt';
 import {
-  busyWarning, chunkText, describeTool, formatDuration, Fuzzy, Mentions, queuePreview, Quota, QuotaGuard, SlashArgs, SlashToken, toolSummary,
+  busyWarning, chunkText, describeTool, explainAutoDenial, formatDuration, Fuzzy, Mentions, queuePreview, Quota, QuotaGuard, SlashArgs, SlashToken, toolSummary,
 } from '../src/core/textTools';
 import { tmp } from './helpers';
 
@@ -51,6 +51,7 @@ const handlers: Record<string, Record<string, Handler>> = {
     quotaPercent: (i) => Quota.percent(win(i.window), i.now) ?? null,
     quotaGuard: (i) => QuotaGuard.blockedUntil(limits(i.limits), i.message ?? undefined, i.now, i.delay) ?? null,
     queuePreview: (i) => queuePreview(i.queue, i.max),
+    explainAutoDenial: (i) => explainAutoDenial(i.text, i.isError),
     busyWarning: (i) => busyWarning(i.streaming, i.queued, i.consequence) ?? null,
     chunkText: (i) => chunkText(i.text, i.max),
     fmtTokens: (i) => fmtTokens(i),

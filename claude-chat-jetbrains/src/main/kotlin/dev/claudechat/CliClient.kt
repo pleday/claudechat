@@ -200,7 +200,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                         else if (c != null && c.isJsonArray) c.asJsonArray.forEach { b ->
                             val bo = b.asJsonObject
                             when (bo["type"]?.asString) {
-                                "tool_result" -> l.onToolResult(bo["tool_use_id"].asString, SessionStore.resultText(bo["content"]), bo["is_error"]?.asBoolean == true)
+                                "tool_result" -> (bo["is_error"]?.asBoolean == true).let { err -> l.onToolResult(bo["tool_use_id"].asString, explainAutoDenial(SessionStore.resultText(bo["content"]), err), err) }
                                 // la CLI rejoue le message quand elle le prend en compte : la précision est consommée
                                 "text" -> refinements.remove(bo["text"]?.asString?.trim())
                             }

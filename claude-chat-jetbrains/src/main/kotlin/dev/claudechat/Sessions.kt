@@ -189,8 +189,8 @@ object SessionStore {
                             val bo = b.asJsonObject
                             if (bo["type"]?.asString == "tool_result") {
                                 tools[bo["tool_use_id"]?.asString]?.let {
-                                    it.result = resultText(bo["content"])
                                     it.isError = bo["is_error"]?.asBoolean == true
+                                    it.result = explainAutoDenial(resultText(bo["content"]), it.isError)
                                 }
                             }
                         }

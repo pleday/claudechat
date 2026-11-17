@@ -68,6 +68,7 @@ class VectorsTest {
             "quotaPercent" to { i -> i.asJsonObject.let { Quota.percent(window(it), it["now"].asLong) } },
             "quotaGuard" to { i -> i.asJsonObject.let { QuotaGuard.blockedUntil(limits(it.opt("limits")), it.opt("message").str(), it["now"].asLong, it["delay"].asLong) } },
             "queuePreview" to { i -> i.asJsonObject.let { queuePreview(it["queue"].asJsonArray.strings(), it["max"].asInt) } },
+            "explainAutoDenial" to { i -> i.asJsonObject.let { explainAutoDenial(it["text"].asString, it["isError"].asBoolean) } },
             "busyWarning" to { i -> i.asJsonObject.let { busyWarning(it["streaming"].asBoolean, it["queued"].asInt, it["consequence"].asString) } },
             "chunkText" to { i -> i.asJsonObject.let { chunkText(it["text"].asString, it["max"].asInt) } },
             "fmtTokens" to { i -> fmtTokens(i.asInt) },
