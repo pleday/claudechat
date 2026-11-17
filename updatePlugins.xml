@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.6/claude-chat-0.9.6.zip" version="0.9.6">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.7/claude-chat-0.9.7.zip" version="0.9.7">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Commandes <code>/</code> de la CLI</b> : la réponse des commandes locales (<code>/context</code>, <code>/cost</code>, <code>/usage</code>, <code>/help</code>…) s'affiche enfin dans la conversation ; elle était perdue, d'où l'impression que « rien ne se passe »</li>
-<li><b>Commandes gérées par le plugin</b> : <code>/mcp</code> ouvre l'écran des serveurs MCP, <code>/clear</code> démarre une nouvelle conversation, <code>/model &lt;nom&gt;</code> et <code>/effort &lt;niveau&gt;</code> règlent les sélecteurs du plugin (la CLI ne les appliquait qu'à un processus relancé à chaque message)</li>
-<li><b>Suggestions d'arguments</b> : après <code>/model </code>, <code>/effort </code>, <code>/mcp </code> (actions, puis serveurs configurés) et <code>/advisor </code>, la complétion propose les valeurs possibles</li>
+<li><b><code>/mcp reconnect|enable|disable &lt;serveur&gt;</code></b> : fonctionne enfin (la CLI refusait ces actions comme commande hors terminal). Le plugin utilise les requêtes de contrôle équivalentes : activer ou désactiver un serveur est mémorisé par la CLI pour le projet et pris en compte dès le prochain message ; une erreur (serveur inconnu…) s'affiche dans la conversation</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
