@@ -276,6 +276,28 @@ ${RESULT}`);
     s.dispose();
   });
 
+  it('/model et /effort règlent les sélecteurs du plugin et /mcp s’ouvre localement, sans message à Claude', async () => {
+    const d = tmp();
+    let mcp = 0;
+    const m = makeEnv(d, fakeCli(d, 'sleep 5'), { openMcp: () => { mcp++; } });
+    const s = new ChatSession(m.env);
+    const notices = () => s.session.entries.filter((e) => e.kind === 'notice').map((e) => e.text);
+    await s.onMessage({ t: 'send', text: '/model haiku', mode: 'queue' });
+    expect(m.ui().model).toBe('claude-haiku-5-5');
+    expect(m.state.get('model')).toBe('claude-haiku-5-5');
+    await s.onMessage({ t: 'send', text: '/model inconnu', mode: 'queue' });
+    expect(m.ui().model).toBe('claude-haiku-5-5');
+    expect(notices().at(-1)).toContain('inconnu');
+    await s.onMessage({ t: 'send', text: '/effort high', mode: 'queue' });
+    expect(m.state.get('effort')).toBe('high');
+    await s.onMessage({ t: 'send', text: '/effort énorme', mode: 'queue' });
+    expect(m.state.get('effort')).toBe('high');
+    await s.onMessage({ t: 'send', text: '/mcp', mode: 'queue' });
+    expect(mcp).toBe(1);
+    expect(s.session.entries.some((e) => e.kind === 'user')).toBe(false); // aucune de ces commandes n'est un message à Claude
+    s.dispose();
+  });
+
   it('mentions : recherche floue dans les fichiers du projet', async () => {
     const d = tmp();
     const m = makeEnv(d, fakeCli(d, 'sleep 5'));

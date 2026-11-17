@@ -442,6 +442,9 @@ export class ChatSession implements RemoteSink {
   private async send(raw: string, mode: 'refine' | 'queue'): Promise<void> {
     const original = raw.trim();
     if (!original && !this.files.length && !this.images.length) return;
+    if (/^\/mcp$/i.test(original)) { this.env.openMcp(); return; } // écran du plugin : la CLI ne peut pas l'afficher
+    if (/^\/clear$/i.test(original)) { await this.newSession(); return; } // la CLI ne répond que par un événement de remise à zéro, ignoré ici
+    if (this.slashChoice(original)) return;
     if (this.streaming) {
       if (mode === 'refine') this.refine(original); else { this.queue.push(original); this.sendQueue(); }
       return;
@@ -815,6 +818,34 @@ export class ChatSession implements RemoteSink {
     void t.setPermissionMode(id).then((r) => {
       if (r && !r.ok) this.addEntry({ kind: 'notice', text: `Le mode « ${id} » prendra effet au prochain message : la CLI le refuse en cours de session${r.error ? ` (${r.error})` : ''}.` });
     });
+  }
+
+  /**
+   * `/model` et `/effort` : la CLI ne les applique qu'à son processus, que le plugin relance à chaque message. On règle donc
+   * les sélecteurs du plugin, qui servent à lancer chaque message. Renvoie false si ce n'est pas l'une de ces commandes.
+   */
+  private slashChoice(original: string): boolean {
+    const m = /^\/(model|effort)(?:[ \t]+(\S+))?$/i.exec(original);
+    if (!m) return false;
+    const notice = (text: string) => this.addEntry({ kind: 'notice', text });
+    const arg = m[2];
+    if (m[1].toLowerCase() === 'model') {
+      const known = this.catalog.known();
+      const names = known.map(([id]) => id).join(', ');
+      if (!arg) { notice(`Modèle : ${this.catalog.display(this.selectedModel)}. Usage : /model <nom> — ${names}.`); return true; }
+      const id = this.catalog.resolve(arg);
+      if (!known.some(([k]) => k === id)) { notice(`Modèle « ${arg} » inconnu. Disponibles : ${names}.`); return true; }
+      this.selectModel(id);
+      notice(`Modèle : ${this.catalog.display(id)}${this.selectedEffort === 'auto' ? '' : ` · effort ${this.selectedEffort}`} (dès le prochain message).`);
+    } else {
+      const levels = this.effortChoices(this.selectedModel);
+      const level = arg?.toLowerCase();
+      if (!level) { notice(`Effort : ${this.selectedEffort}. Usage : /effort <niveau> — ${levels.join(', ')}.`); return true; }
+      if (!levels.includes(level)) { notice(`Effort « ${arg} » non pris en charge par ce modèle. Disponibles : ${levels.join(', ')}.`); return true; }
+      this.selectedEffort = level; this.saveChoices(); this.patch(this.controlsState());
+      notice(`Effort : ${level} (dès le prochain message).`);
+    }
+    return true;
   }
 
   private selectModel(id: string): void {

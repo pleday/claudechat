@@ -495,6 +495,32 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     /** Efforts proposés pour le modèle choisi : ceux qu'il accepte (annoncés par la CLI), sinon la liste générale. */
     private fun effortChoices(model: String) = ModelCatalog.effortChoices(model, EFFORTS)
 
+    /**
+     * `/model` et `/effort` : la CLI ne les applique qu'à son processus, que le plugin relance à chaque message. On règle donc
+     * les sélecteurs du plugin, qui servent à lancer chaque message. Renvoie false si ce n'est pas l'une de ces commandes.
+     */
+    private fun slashChoice(original: String): Boolean {
+        val m = Regex("""^/(model|effort)(?:[ \t]+(\S+))?$""", RegexOption.IGNORE_CASE).find(original) ?: return false
+        fun notice(text: String) { session.entries.add(Entry(Kind.NOTICE, text)); render(forceBottom = true) }
+        val arg = m.groupValues[2].ifEmpty { null }
+        if (m.groupValues[1].lowercase() == "model") {
+            val names = ModelCatalog.known.joinToString(", ") { it.first }
+            if (arg == null) { notice("Modèle : ${ModelCatalog.display(selectedModel)}. Usage : /model <nom> — $names."); return true }
+            val id = ModelCatalog.resolve(arg)
+            if (ModelCatalog.known.none { it.first == id }) { notice("Modèle « $arg » inconnu. Disponibles : $names."); return true }
+            selectModel(id)
+            notice("Modèle : ${ModelCatalog.display(id)}${if (selectedEffort == "auto") "" else " · effort $selectedEffort"} (dès le prochain message).")
+        } else {
+            val levels = effortChoices(selectedModel)
+            if (arg == null) { notice("Effort : $selectedEffort. Usage : /effort <niveau> — ${levels.joinToString(", ")}."); return true }
+            val level = arg.lowercase()
+            if (level !in levels) { notice("Effort « $arg » non pris en charge par ce modèle. Disponibles : ${levels.joinToString(", ")}."); return true }
+            selectedEffort = level; refreshModelButton(); saveChoices()
+            notice("Effort : $level (dès le prochain message).")
+        }
+        return true
+    }
+
     private fun selectModel(id: String) {
         selectedModel = id
         // un effort que le nouveau modèle n'accepte pas ferait échouer la CLI : retour à « auto »
@@ -807,6 +833,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         if (original.isEmpty() && extraFiles.isEmpty() && extraImages.isEmpty()) return
         history.add(original)
         input.text = ""
+        if (original.equals("/mcp", ignoreCase = true)) { showMcpPopup(); return }   // écran du plugin : la CLI ne peut pas l'afficher
+        if (original.equals("/clear", ignoreCase = true)) { newSession(); return }       // la CLI ne répond que par un événement de remise à zéro, ignoré ici
+        if (slashChoice(original)) return
         if (streaming) {
             if (mode == SendMode.REFINE) refine(original) else { queue.add(original); updateQueue() }
             return
