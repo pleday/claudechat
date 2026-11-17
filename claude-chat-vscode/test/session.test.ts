@@ -298,6 +298,28 @@ ${RESULT}`);
     s.dispose();
   });
 
+  it('/mcp enable|disable|reconnect : requêtes de contrôle à la place de la commande refusée par la CLI', async () => {
+    const d = tmp();
+    // la fausse CLI répond à la requête de contrôle de l'action ; les autres requêtes (initialize…) restent sans réponse
+    const cli = fakeCli(d, `read -r line
+case "$line" in
+  *mcp_toggle*foo*) echo '{"type":"control_response","response":{"subtype":"success","request_id":"mcp-once"}}' ;;
+  *mcp_toggle*) echo '{"type":"control_response","response":{"subtype":"error","request_id":"mcp-once","error":"Server not found: bar"}}' ;;
+esac
+sleep 5`);
+    const m = makeEnv(d, cli);
+    const s = new ChatSession(m.env);
+    const notices = () => s.session.entries.filter((e) => e.kind === 'notice').map((e) => e.text);
+    await s.onMessage({ t: 'send', text: '/mcp disable foo', mode: 'queue' });
+    expect(notices().at(-1)).toContain('« foo » : désactivé');
+    await s.onMessage({ t: 'send', text: '/mcp enable bar', mode: 'queue' });
+    expect(notices().at(-1)).toContain('Server not found: bar');
+    await s.onMessage({ t: 'send', text: '/mcp reconnect foo', mode: 'queue' });
+    expect(notices().at(-1)).toContain('reconnecté au prochain message');
+    expect(s.session.entries.some((e) => e.kind === 'user')).toBe(false);
+    s.dispose();
+  });
+
   it('suggestions d\'arguments : serveurs MCP du projet, modèles et efforts', async () => {
     const d = tmp();
     writeFileSync(join(d, '.mcp.json'), JSON.stringify({ mcpServers: { 'mon-serveur': { command: 'x' } } }));

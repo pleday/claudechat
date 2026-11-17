@@ -367,7 +367,7 @@ export class CliTurn {
    * Requête de contrôle sur le processus de cette conversation (mode, renommage, contexte…). null si le processus est
    * terminé ou son entrée fermée, ou s'il ne répond pas dans [timeoutMs].
    */
-  request(subtype: string, fields: Record<string, string> = {}, timeoutMs = 8000): Promise<ControlResult | null> {
+  request(subtype: string, fields: Record<string, unknown> = {}, timeoutMs = 8000): Promise<ControlResult | null> {
     if (this.killed || !this.alive()) return Promise.resolve(null);
     const id = `req-${++this.seq}`;
     return new Promise((resolve) => {
@@ -419,7 +419,7 @@ export class CliTurn {
   }
 }
 
-function controlRequest(id: string, subtype: string, fields: Record<string, string> = {}): Json {
+function controlRequest(id: string, subtype: string, fields: Record<string, unknown> = {}): Json {
   return { type: 'control_request', request_id: id, request: { subtype, ...fields } };
 }
 
@@ -447,7 +447,7 @@ export function exec(cli: string, args: string[], opts: { cwd?: string; timeoutM
  * Lance un processus `claude` à part, lui envoie une seule requête de contrôle (aucun message : aucun appel au
  * modèle) et renvoie sa réponse complète ; undefined en cas d'échec ou de délai dépassé.
  */
-function controlOnce(cli: string, args: string[], cwd: string, id: string, subtype: string, timeoutSec: number): Promise<Json | undefined> {
+function controlOnce(cli: string, args: string[], cwd: string, id: string, subtype: string, timeoutSec: number, fields: Record<string, unknown> = {}): Promise<Json | undefined> {
   return new Promise((resolve) => {
     let p: ChildProcess;
     try { p = spawn(cli, args, { cwd, stdio: ['pipe', 'pipe', 'ignore'] }); } catch { resolve(undefined); return; }
@@ -467,8 +467,27 @@ function controlOnce(cli: string, args: string[], cwd: string, id: string, subty
       if (!line.startsWith('{') || !line.includes(`"${id}"`)) return;
       try { finish(JSON.parse(line)); } catch { /* ligne illisible */ }
     });
-    p.stdin!.write(JSON.stringify(controlRequest(id, subtype)) + '\n');
+    p.stdin!.write(JSON.stringify(controlRequest(id, subtype, fields)) + '\n');
   });
+}
+
+export type McpAction = 'reconnect' | 'enable' | 'disable';
+
+/** Requête de contrôle qui réalise `/mcp reconnect|enable|disable <serveur>` (la commande `/mcp` elle-même est refusée hors terminal). */
+export function mcpControl(action: McpAction, server: string): [string, Record<string, unknown>] {
+  return action === 'reconnect' ? ['mcp_reconnect', { serverName: server }] : ['mcp_toggle', { serverName: server, enabled: action === 'enable' }];
+}
+
+/**
+ * Exécute une action MCP dans un processus à part (sans message, donc sans appel au modèle), avec la configuration MCP
+ * réelle du projet : activer ou désactiver un serveur est mémorisé par la CLI pour ce projet. undefined : pas de réponse.
+ */
+export async function mcpControlOnce(cli: string, cwd: string, action: McpAction, server: string, timeoutSec = 30): Promise<ControlResult | undefined> {
+  const [subtype, fields] = mcpControl(action, server);
+  const j = await controlOnce(cli, baseArgs, cwd, 'mcp-once', subtype, timeoutSec, fields);
+  const resp = j?.response;
+  if (!resp || typeof resp !== 'object') return undefined;
+  return { ok: resp.subtype === 'success', payload: controlPayload(j!), error: typeof resp.error === 'string' ? resp.error : undefined };
 }
 
 const baseArgs = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence'];

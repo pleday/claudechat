@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  CliTurn, contextUsageOnce, fetchInit, probeQuota, type ContentBlock, type Json, type PermissionRequest, type QuotaWindow, type RateLimits,
+  CliTurn, contextUsageOnce, fetchInit, mcpControl, mcpControlOnce, probeQuota, type ContentBlock, type ControlResult, type McpAction, type Json, type PermissionRequest, type QuotaWindow, type RateLimits,
   type TurnListener, type TurnOptions,
 } from '../core/cli';
 import { ChangeTracker, FsBaseline, GENERATED_DIRS, type ChangedFile } from '../core/changes';
@@ -474,6 +474,8 @@ export class ChatSession implements RemoteSink {
     if (/^\/mcp$/i.test(original)) { this.env.openMcp(); return; } // écran du plugin : la CLI ne peut pas l'afficher
     if (/^\/clear$/i.test(original)) { await this.newSession(); return; } // la CLI ne répond que par un événement de remise à zéro, ignoré ici
     if (this.slashChoice(original)) return;
+    const mcp = /^\/mcp[ \t]+(reconnect|enable|disable)[ \t]+(\S+)$/i.exec(original);
+    if (mcp) { await this.mcpAction(mcp[1].toLowerCase() as McpAction, mcp[2]); return; }
     if (this.streaming) {
       if (mode === 'refine') this.refine(original); else { this.queue.push(original); this.sendQueue(); }
       return;
@@ -847,6 +849,22 @@ export class ChatSession implements RemoteSink {
     void t.setPermissionMode(id).then((r) => {
       if (r && !r.ok) this.addEntry({ kind: 'notice', text: `Le mode « ${id} » prendra effet au prochain message : la CLI le refuse en cours de session${r.error ? ` (${r.error})` : ''}.` });
     });
+  }
+
+  /**
+   * `/mcp reconnect|enable|disable <serveur>` : la CLI refuse ces actions comme commande hors terminal, mais accepte les
+   * requêtes de contrôle équivalentes. Sur le processus de la conversation s'il tourne, sinon dans un processus à part
+   * (activer ou désactiver est mémorisé par la CLI pour le projet ; une reconnexion n'a de sens que sur un processus vivant).
+   */
+  private async mcpAction(action: McpAction, server: string): Promise<void> {
+    const notice = (text: string) => this.addEntry({ kind: 'notice', text });
+    const [subtype, fields] = mcpControl(action, server);
+    const live = this.turn ?? this.idleTurn;
+    let r: ControlResult | null | undefined = live ? await live.request(subtype, fields) : undefined;
+    if (!r && action === 'reconnect') { notice(`Aucun processus actif : le serveur « ${server} » est reconnecté au prochain message.`); return; }
+    r ??= await mcpControlOnce(this.env.cliPath(), this.cwd(), action, server);
+    if (!r?.ok) { notice(`Serveur MCP « ${server} » : ${r ? (r.error ?? 'refusé par la CLI') : 'la CLI ne répond pas'}.`); return; }
+    notice(`Serveur MCP « ${server} » : ${{ reconnect: 'reconnexion demandée', enable: 'activé', disable: 'désactivé' }[action]}${action === 'reconnect' ? '' : ' (dès le prochain message)'}.`);
   }
 
   /**

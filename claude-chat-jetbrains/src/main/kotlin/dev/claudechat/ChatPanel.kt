@@ -496,6 +496,29 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun effortChoices(model: String) = ModelCatalog.effortChoices(model, EFFORTS)
 
     /**
+     * `/mcp reconnect|enable|disable <serveur>` : la CLI refuse ces actions comme commande hors terminal, mais accepte les
+     * requêtes de contrôle équivalentes. Sur le processus de la conversation s'il tourne, sinon dans un processus à part
+     * (activer ou désactiver est mémorisé par la CLI pour le projet ; une reconnexion n'a de sens que sur un processus vivant).
+     */
+    private fun mcpAction(action: String, server: String) {
+        fun notice(text: String) { session.entries.add(Entry(Kind.NOTICE, text)); render(forceBottom = true) }
+        val (subtype, fields) = CliTurn.mcpControl(action, server)
+        val live = turn ?: idleTurn
+        val cli = settings.cliPath()
+        val dir = cwd
+        ApplicationManager.getApplication().executeOnPooledThread {
+            var r = live?.request(subtype, fields)
+            val text = if (r == null && action == "reconnect") "Aucun processus actif : le serveur « $server » est reconnecté au prochain message."
+            else {
+                if (r == null) r = CliTurn.mcpControlOnce(cli, dir, action, server)
+                if (r?.ok != true) "Serveur MCP « $server » : ${if (r != null) (r.error ?: "refusé par la CLI") else "la CLI ne répond pas"}."
+                else "Serveur MCP « $server » : " + when (action) { "reconnect" -> "reconnexion demandée."; "enable" -> "activé (dès le prochain message)."; else -> "désactivé (dès le prochain message)." }
+            }
+            ApplicationManager.getApplication().invokeLater({ notice(text) }, ModalityState.any())
+        }
+    }
+
+    /**
      * `/model` et `/effort` : la CLI ne les applique qu'à son processus, que le plugin relance à chaque message. On règle donc
      * les sélecteurs du plugin, qui servent à lancer chaque message. Renvoie false si ce n'est pas l'une de ces commandes.
      */
@@ -836,6 +859,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         if (original.equals("/mcp", ignoreCase = true)) { showMcpPopup(); return }   // écran du plugin : la CLI ne peut pas l'afficher
         if (original.equals("/clear", ignoreCase = true)) { newSession(); return }       // la CLI ne répond que par un événement de remise à zéro, ignoré ici
         if (slashChoice(original)) return
+        Regex("""^/mcp[ \t]+(reconnect|enable|disable)[ \t]+(\S+)$""", RegexOption.IGNORE_CASE).find(original)?.let { mcpAction(it.groupValues[1].lowercase(), it.groupValues[2]); return }
         if (streaming) {
             if (mode == SendMode.REFINE) refine(original) else { queue.add(original); updateQueue() }
             return

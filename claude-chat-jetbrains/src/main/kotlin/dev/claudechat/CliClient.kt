@@ -306,7 +306,7 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
      * Requête de contrôle sur le processus de cette conversation (mode, renommage, contexte…). Bloquant ; null si le
      * processus est terminé ou son entrée fermée (rien n'a été envoyé), ou s'il ne répond pas dans [timeoutMs].
      */
-    fun request(subtype: String, fields: Map<String, String> = emptyMap(), timeoutMs: Long = 8_000): ControlResult? {
+    fun request(subtype: String, fields: Map<String, Any> = emptyMap(), timeoutMs: Long = 8_000): ControlResult? {
         if (killed || proc?.isAlive != true) return null
         val id = "req-${requestSeq.incrementAndGet()}"
         val f = java.util.concurrent.CompletableFuture<ControlResult>()
@@ -423,19 +423,19 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
         fun cleanSuggestion(raw: String?): String? =
             raw?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.take(300)?.takeIf { it.isNotEmpty() }
 
-        private fun controlRequest(id: String, subtype: String, fields: Map<String, String> = emptyMap()) = JsonObject().apply {
+        private fun controlRequest(id: String, subtype: String, fields: Map<String, Any> = emptyMap()) = JsonObject().apply {
             addProperty("type", "control_request"); addProperty("request_id", id)
-            add("request", JsonObject().apply { addProperty("subtype", subtype); fields.forEach { (k, v) -> addProperty(k, v) } })
+            add("request", JsonObject().apply { addProperty("subtype", subtype); fields.forEach { (k, v) -> if (v is Boolean) addProperty(k, v) else addProperty(k, v.toString()) } })
         }
 
         /**
          * Lance un processus `claude` à part, lui envoie une seule requête de contrôle (aucun message : aucun appel au
          * modèle) et renvoie sa réponse complète ; null en cas d'échec ou de délai dépassé. Bloquant.
          */
-        private fun controlOnce(args: List<String>, cwd: String, id: String, subtype: String, timeoutSec: Long): JsonObject? = try {
+        private fun controlOnce(args: List<String>, cwd: String, id: String, subtype: String, timeoutSec: Long, fields: Map<String, Any> = emptyMap()): JsonObject? = try {
             val p = ProcessBuilder(args).directory(java.io.File(cwd)).redirectError(ProcessBuilder.Redirect.DISCARD).start()
             val w = p.outputStream.bufferedWriter()
-            w.write(controlRequest(id, subtype).toString()); w.newLine(); w.flush()
+            w.write(controlRequest(id, subtype, fields).toString()); w.newLine(); w.flush()
             var res: JsonObject? = null
             val reader = Thread {
                 p.inputStream.bufferedReader().useLines { lines ->
@@ -451,6 +451,22 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
             p.destroy()
             res
         } catch (_: Exception) { null }
+
+        /** Requête de contrôle qui réalise `/mcp reconnect|enable|disable <serveur>` (la commande `/mcp` elle-même est refusée hors terminal). */
+        fun mcpControl(action: String, server: String): Pair<String, Map<String, Any>> =
+            if (action == "reconnect") "mcp_reconnect" to mapOf("serverName" to server)
+            else "mcp_toggle" to mapOf("serverName" to server, "enabled" to (action == "enable"))
+
+        /**
+         * Exécute une action MCP dans un processus à part (sans message, donc sans appel au modèle), avec la configuration MCP
+         * réelle du projet : activer ou désactiver un serveur est mémorisé par la CLI pour ce projet. Bloquant ; null : pas de réponse.
+         */
+        fun mcpControlOnce(cli: String, cwd: String, action: String, server: String, timeoutSec: Long = 30): ControlResult? {
+            val (subtype, fields) = mcpControl(action, server)
+            val j = controlOnce(baseArgs(cli), cwd, "mcp-once", subtype, timeoutSec, fields) ?: return null
+            val resp = j["response"]?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+            return ControlResult(resp["subtype"]?.asString == "success", controlPayload(j), resp["error"]?.takeIf { it.isJsonPrimitive }?.asString)
+        }
 
         private fun baseArgs(cli: String) =
             listOf(cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence")
