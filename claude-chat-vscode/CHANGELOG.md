@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.5
+
+- **Commandes `/` de la CLI** : la réponse des commandes locales (`/context`, `/cost`, `/usage`, `/help`…) s'affiche enfin dans la conversation ; elle était perdue, d'où l'impression que « rien ne se passe »
+- **Commandes gérées par le plugin** : `/mcp` ouvre l'écran des serveurs MCP, `/clear` démarre une nouvelle conversation, `/model <nom>` et `/effort <niveau>` règlent les sélecteurs du plugin (la CLI ne les appliquait qu'à un processus relancé à chaque message)
+- **Suggestions d'arguments** : après `/model `, `/effort `, `/mcp ` (actions, puis serveurs configurés) et `/advisor `, la complétion propose les valeurs possibles
+- **Complétion `/`** : une commande tapée en entier n'est plus reproposée, Entrée l'envoie au lieu de la compléter
+
 ## 0.9.4
 
 - **Zone de saisie** : plus haute par défaut (3 lignes) et redimensionnable : poignée au bord haut de la carte (glisser pour agrandir ou réduire, double-clic pour revenir à la taille par défaut), hauteur mémorisée
