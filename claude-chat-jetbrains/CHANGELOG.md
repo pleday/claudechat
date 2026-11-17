@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.6
+
+- **Commandes `/` de la CLI** : la réponse des commandes locales (`/context`, `/cost`, `/usage`, `/help`…) s'affiche enfin dans la conversation ; elle était perdue, d'où l'impression que « rien ne se passe »
+- **Commandes gérées par le plugin** : `/mcp` ouvre l'écran des serveurs MCP, `/clear` démarre une nouvelle conversation, `/model <nom>` et `/effort <niveau>` règlent les sélecteurs du plugin (la CLI ne les appliquait qu'à un processus relancé à chaque message)
+- **Suggestions d'arguments** : après `/model `, `/effort `, `/mcp ` (actions, puis serveurs configurés) et `/advisor `, la complétion propose les valeurs possibles
+
 ## 0.9.5
 
 - **Fichiers modifiés par Claude** : moins de bruit. Les fichiers écrits dans un dossier temporaire (`/tmp`, scratchpad de Claude), dans `.claude/worktrees` ou dans un dossier généré (`build`, `node_modules`…) ne sont plus listés, et les worktrees ne sont plus parcourus par la détection des changements faits par les commandes
