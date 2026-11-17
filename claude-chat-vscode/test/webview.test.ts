@@ -22,6 +22,7 @@ beforeAll(async () => {
 const base: Partial<UiState> = {
   mode: 'manual', model: 'claude-sonnet-5-5', effort: 'auto', efforts: ['auto', 'low', 'high'], busyMode: 'refine', cwd: '/p',
   models: [{ id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', description: '', isAlias: true }, { id: 'claude-opus-4-1', name: 'Opus 4.1', description: '', isAlias: false }],
+  slashArgs: { mcp: [{ reconnect: 'Reconnecter', enable: 'Activer' }, { alpha: 'Utilisateur', beta: 'Projet' }], model: [{ haiku: 'Haiku 5.5' }] },
   slash: [{ name: 'explain', category: 'Raccourcis du plugin', description: 'Expliquer' }, { name: 'compact', category: 'Session', description: 'Résumer' }],
 };
 
@@ -142,6 +143,27 @@ describe('interface du webview', () => {
     input.value = '/compact'; input.setSelectionRange(8, 8);
     input.dispatchEvent(new Event('input'));
     expect($('completion').hidden).toBe(true);
+    input.value = '';
+  });
+
+  it('complétion des arguments : actions puis serveurs ; valeur entière non reproposée', () => {
+    const input = $('input') as HTMLTextAreaElement;
+    const box = $('completion');
+    const rows = () => [...box.querySelectorAll('.crow')].map((r) => r.firstChild?.textContent);
+    input.value = '/mcp '; input.setSelectionRange(5, 5);
+    input.dispatchEvent(new Event('input'));
+    expect(rows()).toEqual(['reconnect', 'enable']);
+    input.value = '/mcp reconnect '; input.setSelectionRange(15, 15);
+    input.dispatchEvent(new Event('input'));
+    expect(rows()).toEqual(['alpha', 'beta']);
+    input.value = '/mcp reconnect b'; input.setSelectionRange(16, 16);
+    input.dispatchEvent(new Event('input'));
+    expect(rows()).toEqual(['beta']);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    expect(input.value).toBe('/mcp reconnect beta ');
+    input.value = '/model haiku'; input.setSelectionRange(12, 12);
+    input.dispatchEvent(new Event('input'));
+    expect(box.hidden).toBe(true);
     input.value = '';
   });
 

@@ -963,5 +963,193 @@
    },
    "out": true
   }
+ ],
+ "slashArg": [
+  {
+   "in": {
+    "text": "/model ",
+    "caret": 7
+   },
+   "out": {
+    "command": "model",
+    "index": 0,
+    "start": 7,
+    "query": ""
+   }
+  },
+  {
+   "in": {
+    "text": "/model ha",
+    "caret": 9
+   },
+   "out": {
+    "command": "model",
+    "index": 0,
+    "start": 7,
+    "query": "ha"
+   }
+  },
+  {
+   "in": {
+    "text": "/mcp reconnect ",
+    "caret": 15
+   },
+   "out": {
+    "command": "mcp",
+    "index": 1,
+    "start": 15,
+    "query": ""
+   }
+  },
+  {
+   "in": {
+    "text": "/mcp reconnect my",
+    "caret": 17
+   },
+   "out": {
+    "command": "mcp",
+    "index": 1,
+    "start": 15,
+    "query": "my"
+   }
+  },
+  {
+   "in": {
+    "text": "/model",
+    "caret": 6
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "text": "texte /model ha",
+    "caret": 15
+   },
+   "out": null
+  },
+  {
+   "in": {
+    "text": "/explain @src/a",
+    "caret": 15
+   },
+   "out": {
+    "command": "explain",
+    "index": 0,
+    "start": 9,
+    "query": "@src/a"
+   }
+  },
+  {
+   "in": {
+    "text": "/model haiku suite",
+    "caret": 7
+   },
+   "out": {
+    "command": "model",
+    "index": 0,
+    "start": 7,
+    "query": ""
+   }
+  },
+  {
+   "in": {
+    "text": "/a:b ",
+    "caret": 5
+   },
+   "out": {
+    "command": "a:b",
+    "index": 0,
+    "start": 5,
+    "query": ""
+   }
+  },
+  {
+   "in": {
+    "text": "/model\nsuite",
+    "caret": 13
+   },
+   "out": null
+  }
+ ],
+ "slashArgOptions": [
+  {
+   "in": {
+    "spec": [
+     {
+      "reconnect": "Reconnecter",
+      "enable": "Activer",
+      "disable": "Désactiver"
+     }
+    ],
+    "index": 0,
+    "query": ""
+   },
+   "out": [
+    [
+     "reconnect",
+     "Reconnecter"
+    ],
+    [
+     "enable",
+     "Activer"
+    ],
+    [
+     "disable",
+     "Désactiver"
+    ]
+   ]
+  },
+  {
+   "in": {
+    "spec": [
+     {
+      "reconnect": "Reconnecter",
+      "enable": "Activer",
+      "disable": "Désactiver"
+     }
+    ],
+    "index": 0,
+    "query": "RE"
+   },
+   "out": [
+    [
+     "reconnect",
+     "Reconnecter"
+    ]
+   ]
+  },
+  {
+   "in": {
+    "spec": [
+     {
+      "reconnect": "Reconnecter"
+     }
+    ],
+    "index": 1,
+    "query": ""
+   },
+   "out": []
+  },
+  {
+   "in": {
+    "spec": null,
+    "index": 0,
+    "query": ""
+   },
+   "out": []
+  },
+  {
+   "in": {
+    "spec": [
+     {
+      "low": "",
+      "high": ""
+     }
+    ],
+    "index": 0,
+    "query": "x"
+   },
+   "out": []
+  }
  ]
 }

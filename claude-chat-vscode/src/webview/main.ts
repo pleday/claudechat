@@ -4,7 +4,7 @@ import { InputHistory } from '../core/inputHistory';
 import type { Entry } from '../core/sessions';
 import { SlashCatalog, Tips } from '../core/slashCatalog';
 import { pickSticky } from '../core/stickyPrompt';
-import { Mentions, PERMISSION_MODES, queuePreview, SlashToken } from '../core/textTools';
+import { Mentions, PERMISSION_MODES, queuePreview, SlashArgs, SlashToken } from '../core/textTools';
 import type { HostMsg, UiState, UsageReport, WebMsg } from '../protocol';
 import { applyKnownFiles, el, renderEntry, startsResponse, type RenderCtx } from './render';
 
@@ -19,7 +19,7 @@ const state: UiState = {
   streaming: false, statusText: '', statusTip: '', resume: null, ringPercent: 0, ringTip: '', mode: 'manual', model: '', effort: 'auto',
   efforts: ['auto'], models: [], busyMode: 'refine', contextOn: true, contextFile: '', remoteOn: false, autoResumeOn: false, canFork: false,
   forkPending: false, battery: { remaining: null, tip: '' }, usageLine: '', queue: [], changes: null, suggestion: null, attachments: [],
-  interaction: null, title: '', slash: [], projectName: '', cwd: '',
+  interaction: null, title: '', slash: [], slashArgs: {}, projectName: '', cwd: '',
 };
 
 let entries: Entry[] = [];
@@ -467,12 +467,12 @@ interface Row { text: string; value: string; header?: boolean; desc?: string }
 let rows: Row[] = [];
 let sel = 0;
 let completionAnchor = 0;
-let completionKind: 'mention' | 'slash' | undefined;
+let completionKind: 'mention' | 'slash' | 'arg' | undefined;
 let mentionSeq = 0;
 
 function hideCompletion(): void { $('completion').hidden = true; rows = []; completionKind = undefined; }
 
-function showCompletion(list: Row[], kind: 'mention' | 'slash'): void {
+function showCompletion(list: Row[], kind: 'mention' | 'slash' | 'arg'): void {
   rows = list; completionKind = kind;
   const box = $('completion');
   if (!list.some((r) => !r.header)) { hideCompletion(); return; }
@@ -506,7 +506,7 @@ function accept(): void {
   if (!r || r.header) return;
   const caret = input.selectionStart;
   const value = input.value;
-  const insert = completionKind === 'slash' ? `/${r.value} ` : `@${r.value} `;
+  const insert = completionKind === 'slash' ? `/${r.value} ` : completionKind === 'arg' ? `${r.value} ` : `@${r.value} `;
   input.value = value.slice(0, completionAnchor) + insert + value.slice(caret);
   const at = completionAnchor + insert.length;
   input.setSelectionRange(at, at);
@@ -516,6 +516,15 @@ function accept(): void {
 function onInputChange(): void {
   autosize(); drawSend();
   const caret = input.selectionStart;
+  const arg = SlashToken.activeArg(input.value, caret);
+  const opts = arg ? SlashArgs.suggest(state.slashArgs[arg.command.toLowerCase()], arg.index, arg.query) : [];
+  if (arg && opts.length) {
+    // valeur déjà saisie en entier : inutile de la reproposer (Entrée doit envoyer, pas compléter)
+    if (opts.length === 1 && opts[0][0].toLowerCase() === arg.query.toLowerCase()) { hideCompletion(); return; }
+    completionAnchor = arg.start;
+    showCompletion(opts.map(([value, desc]) => ({ text: value, value, desc })), 'arg');
+    return;
+  }
   const slash = SlashToken.activeQuery(input.value, caret);
   if (slash !== undefined) {
     completionAnchor = 0;

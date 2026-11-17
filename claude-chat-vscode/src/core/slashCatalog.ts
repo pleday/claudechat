@@ -11,6 +11,8 @@ export const SlashCatalog = {
   PLUGIN: data.pluginCategory,
   /** Ordre d'affichage des groupes. */
   ORDER: data.categories as string[],
+  /** Valeurs proposées après `/commande ` (une table valeur -> description par rang d'argument). */
+  ARGS: data.args as Record<string, Array<Record<string, string>>>,
   SKILLS: 'Skills et extensions',
   PLUGINS: 'Plugins',
 

@@ -5,12 +5,13 @@ import {
   type TurnListener, type TurnOptions,
 } from '../core/cli';
 import { ChangeTracker, FsBaseline, GENERATED_DIRS, type ChangedFile } from '../core/changes';
-import { DEFAULT_MODEL, LIMITS } from '../core/constants';
+import { DEFAULT_MODEL, FALLBACK_MODELS, LIMITS } from '../core/constants';
 import { fmtTokens, isAlias, type ContextUsage } from '../core/cliInfo';
 import { resolveMention } from '../core/mentionPath';
 import { ModelCatalog } from '../core/models';
 import type { RemoteBridge, RemoteHandle, RemoteSink } from '../core/remote';
 import { listSessions, liveTitle, renameSession as storeRename, DEFAULT_TITLE, type Entry, type Kind, type Session } from '../core/sessions';
+import { MCP_SCOPES, readConfigs } from '../core/mcp';
 import { SlashCatalog } from '../core/slashCatalog';
 import {
   busyWarning, describeTool, EDIT_TOOLS, EFFORTS, expandSlash, filePathOf, formatDuration, Fuzzy, isCommandTool, Mentions, moveItem, Quota,
@@ -203,6 +204,7 @@ export class ChatSession implements RemoteSink {
       effort: efforts.includes(this.selectedEffort) ? this.selectedEffort : 'auto',
       efforts,
       models: this.modelChoices(),
+      slashArgs: this.slashArgs(efforts),
       busyMode: this.busyMode,
       contextOn: this.contextOn,
       remoteOn: this.remoteOn,
@@ -219,6 +221,33 @@ export class ChatSession implements RemoteSink {
     for (const id of extra) if (!out.some((m) => m.id === id)) out.push({ id, name: this.catalog.label(id), description: '', isAlias: false });
     if (!out.some((m) => m.id === this.selectedModel)) out.push({ id: this.selectedModel, name: this.catalog.label(this.selectedModel), description: '', isAlias: false });
     return out;
+  }
+
+  private mcpCache: { at: number; cwd: string; names: Record<string, string> } | undefined;
+
+  /** Serveurs MCP configurés (utilisateur, projet, local) pour `/mcp reconnect|enable|disable` ; relus au plus toutes les 5 s. */
+  private mcpNames(): Record<string, string> {
+    const cwd = this.cwd();
+    if (this.mcpCache && this.mcpCache.cwd === cwd && Date.now() - this.mcpCache.at < 5000) return this.mcpCache.names;
+    const names: Record<string, string> = {};
+    try {
+      // un nom avec espace ne peut pas être saisi comme argument : on ne le propose pas
+      for (const sv of readConfigs(cwd)) if (/^\S+$/.test(sv.name) && !(sv.name in names)) names[sv.name] = MCP_SCOPES[sv.scope].title;
+    } catch { /* fichier illisible : pas de proposition */ }
+    this.mcpCache = { at: Date.now(), cwd, names };
+    return names;
+  }
+
+  /** Arguments proposés après `/commande ` : table commune, plus les modèles et efforts réellement disponibles. */
+  private slashArgs(efforts: string[]): UiState['slashArgs'] {
+    const cli = this.catalog.all();
+    const models = cli.length ? cli.map((m) => [m.alias || m.id, m.name]) : FALLBACK_MODELS.map((m) => [m.alias, m.name]);
+    return {
+      ...SlashCatalog.ARGS,
+      mcp: [...(SlashCatalog.ARGS.mcp ?? []), this.mcpNames()],
+      model: [Object.fromEntries(models)],
+      effort: [Object.fromEntries(efforts.map((e) => [e, '']))],
+    };
   }
 
   private effortChoices(model: string): string[] { return this.catalog.effortChoices(model, EFFORTS); }

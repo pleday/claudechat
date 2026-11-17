@@ -23,6 +23,23 @@
     "doc": "Ajouter de la documentation",
     "review": "Revue de code par gravité"
   },
+  "args": {
+    "mcp": [
+      {
+        "reconnect": "Reconnecter un serveur",
+        "enable": "Activer un serveur",
+        "disable": "Désactiver un serveur"
+      }
+    ],
+    "advisor": [
+      {
+        "fable": "Fable",
+        "opus": "Opus",
+        "sonnet": "Sonnet",
+        "off": "Désactiver le conseiller"
+      }
+    ]
+  },
   "known": {
     "clear": {
       "category": "Session",

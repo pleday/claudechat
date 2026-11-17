@@ -57,6 +57,29 @@ export const SlashToken = {
   },
   filter: (query: string, commands: Iterable<string>) =>
     [...commands].filter((c) => c.toLowerCase().startsWith(query.toLowerCase())).sort(),
+  /**
+   * Argument en cours de frappe après `/commande ` : la commande, le rang de l'argument (0 = premier), le début du mot
+   * dans le texte et ce qui en est déjà saisi. undefined hors d'une commande initiale suivie d'un espace.
+   */
+  activeArg(text: string, caret: number): { command: string; index: number; start: number; query: string } | undefined {
+    const before = text.slice(0, Math.min(Math.max(caret, 0), text.length));
+    const m = /^\/([\w:.-]+)[ \t]+([^\n]*)$/.exec(before);
+    if (!m) return undefined;
+    const words = m[2].split(/[ \t]+/);
+    const query = words[words.length - 1];
+    return { command: m[1], index: words.length - 1, start: before.length - query.length, query };
+  },
+};
+
+/** Valeurs proposées pour les arguments d'une commande : une table `valeur -> description` par rang d'argument. */
+export type SlashArgSpec = Array<Record<string, string>>;
+export const SlashArgs = {
+  /** [valeur, description] du rang `index` qui commencent par `query` (ordre de la table). */
+  suggest(spec: SlashArgSpec | undefined, index: number, query: string): Array<[string, string]> {
+    const table = spec?.[index];
+    if (!table) return [];
+    return Object.entries(table).filter(([v]) => v.toLowerCase().startsWith(query.toLowerCase()));
+  },
 };
 
 const s = (i: Json, k: string): string | undefined => (typeof i[k] === 'string' ? i[k] : undefined);

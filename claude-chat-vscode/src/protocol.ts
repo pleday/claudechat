@@ -53,6 +53,8 @@ export interface UiState {
   interaction: InteractionView | null;
   title: string;
   slash: SlashEntry[];
+  /** Valeurs proposées après `/commande ` (modèles et efforts compris), par commande puis par rang d'argument. */
+  slashArgs: Record<string, Array<Record<string, string>>>;
   projectName: string;
   /** Dossier du projet (pour raccourcir les chemins affichés). */
   cwd: string;

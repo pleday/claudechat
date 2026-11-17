@@ -13,7 +13,7 @@ import { listSessions, loadSession, paths, projectDir } from '../src/core/sessio
 import { SlashCatalog } from '../src/core/slashCatalog';
 import { isResume, pickSticky } from '../src/core/stickyPrompt';
 import {
-  busyWarning, chunkText, describeTool, formatDuration, Fuzzy, Mentions, queuePreview, Quota, QuotaGuard, SlashToken, toolSummary,
+  busyWarning, chunkText, describeTool, formatDuration, Fuzzy, Mentions, queuePreview, Quota, QuotaGuard, SlashArgs, SlashToken, toolSummary,
 } from '../src/core/textTools';
 import { tmp } from './helpers';
 
@@ -42,6 +42,8 @@ const handlers: Record<string, Record<string, Handler>> = {
     mentionsActive: (i) => Mentions.activeToken(i.text, i.caret) ?? null,
     slashActive: (i) => SlashToken.activeQuery(i.text, i.caret) ?? null,
     slashFilter: (i) => SlashToken.filter(i.query, i.commands),
+    slashArg: (i) => SlashToken.activeArg(i.text, i.caret) ?? null,
+    slashArgOptions: (i) => SlashArgs.suggest(i.spec ?? undefined, i.index, i.query),
     toolSummary: (i) => toolSummary(i.name, i.input),
     describeTool: (i) => describeTool(i.name, i.input),
     formatDuration: (i) => formatDuration(i),

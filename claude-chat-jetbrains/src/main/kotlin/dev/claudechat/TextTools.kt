@@ -68,6 +68,24 @@ object SlashToken {
 
     fun filter(query: String, commands: Collection<String>): List<String> =
         commands.filter { it.startsWith(query, ignoreCase = true) }.sorted()
+
+    /** Argument en cours de frappe après `/commande `. [start] : début du mot dans le texte ; [index] : rang (0 = premier). */
+    data class Arg(val command: String, val index: Int, val start: Int, val query: String)
+
+    fun activeArg(text: String, caret: Int): Arg? {
+        val before = text.substring(0, caret.coerceIn(0, text.length))
+        val m = Regex("""^/([\w:.-]+)[ \t]+([^\n]*)$""").find(before) ?: return null
+        val words = m.groupValues[2].split(Regex("""[ \t]+"""))
+        val query = words.last()
+        return Arg(m.groupValues[1], words.size - 1, before.length - query.length, query)
+    }
+}
+
+/** Valeurs proposées pour les arguments d'une commande : une table `valeur -> description` par rang d'argument. */
+object SlashArgs {
+    /** (valeur, description) du rang [index] qui commencent par [query] (ordre de la table). */
+    fun suggest(spec: List<Map<String, String>>?, index: Int, query: String): List<Pair<String, String>> =
+        spec?.getOrNull(index)?.entries?.filter { it.key.startsWith(query, ignoreCase = true) }?.map { it.key to it.value } ?: emptyList()
 }
 
 /** Surlignage d'une recherche dans du HTML, sans toucher aux balises (FR-07). */

@@ -298,6 +298,20 @@ ${RESULT}`);
     s.dispose();
   });
 
+  it('suggestions d\'arguments : serveurs MCP du projet, modèles et efforts', async () => {
+    const d = tmp();
+    writeFileSync(join(d, '.mcp.json'), JSON.stringify({ mcpServers: { 'mon-serveur': { command: 'x' } } }));
+    const m = makeEnv(d, fakeCli(d, 'sleep 5'));
+    const s = new ChatSession(m.env);
+    await s.onMessage({ t: 'setEffort', id: 'high' });
+    const args = m.ui().slashArgs!;
+    expect(Object.keys(args.mcp[0])).toEqual(['reconnect', 'enable', 'disable']);
+    expect(args.mcp[1]['mon-serveur']).toBe('Projet');
+    expect(Object.keys(args.model[0])).toContain('haiku');
+    expect(Object.keys(args.effort[0])).toContain('high');
+    s.dispose();
+  });
+
   it('mentions : recherche floue dans les fichiers du projet', async () => {
     const d = tmp();
     const m = makeEnv(d, fakeCli(d, 'sleep 5'));

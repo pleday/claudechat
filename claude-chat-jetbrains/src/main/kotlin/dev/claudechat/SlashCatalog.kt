@@ -26,6 +26,11 @@ object SlashCatalog {
 
     private val local: Map<String, String> = strings(data["local"].asJsonObject)
 
+    /** Valeurs proposées après `/commande ` : une table valeur -> description par rang d'argument. */
+    val ARGS: Map<String, List<Map<String, String>>> = data["args"].asJsonObject.entrySet().associate { (n, v) ->
+        n to v.asJsonArray.map { strings(it.asJsonObject) }
+    }
+
     /** Catégorie et description française des commandes connues de la CLI. */
     private val known: Map<String, Pair<String, String>> = data["known"].asJsonObject.entrySet().associate { (n, v) ->
         n to (v.asJsonObject["category"].asString to v.asJsonObject["description"].asString)

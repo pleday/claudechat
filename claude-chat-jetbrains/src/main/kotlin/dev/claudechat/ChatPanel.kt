@@ -1810,6 +1810,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun mentionChanged() {
         SwingUtilities.invokeLater {
+            val arg = SlashToken.activeArg(input.text, input.caretPosition)
+            val argOptions = arg?.let { SlashArgs.suggest(slashArgs()[it.command.lowercase()], it.index, it.query) }.orEmpty()
+            if (arg != null && argOptions.isNotEmpty()) { searchAlarm.cancelAllRequests(); showSlashArgPopup(arg, argOptions); return@invokeLater }
             val slash = SlashToken.activeQuery(input.text, input.caretPosition)
             if (slash != null) { searchAlarm.cancelAllRequests(); showSlashPopup(slash); return@invokeLater }
             val tok = Mentions.activeToken(input.text, input.caretPosition)
@@ -1919,6 +1922,39 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             "close" -> { popup.cancel(); mentionPopup = null }
         }
         return true
+    }
+
+    /** Arguments proposés après `/commande ` : table commune, plus les modèles et efforts réellement disponibles. */
+    private fun slashArgs(): Map<String, List<Map<String, String>>> {
+        val cli = ModelCatalog.all()
+        val models = if (cli.isNotEmpty()) cli.associate { it.alias.ifEmpty { it.id } to it.name } else Constants.fallbackModels.associate { it.second to it.third }
+        val mcp = SlashCatalog.ARGS["mcp"].orEmpty() + listOf(mcpNames())
+        return SlashCatalog.ARGS + mapOf("mcp" to mcp, "model" to listOf(models), "effort" to listOf(effortChoices(selectedModel).associateWith { "" }))
+    }
+
+    private var mcpCache: Triple<Long, String, Map<String, String>>? = null
+
+    /** Serveurs MCP configurés (utilisateur, projet, local) pour `/mcp reconnect|enable|disable` ; relus au plus toutes les 5 s. */
+    private fun mcpNames(): Map<String, String> {
+        mcpCache?.takeIf { it.second == cwd && System.currentTimeMillis() - it.first < 5000 }?.let { return it.third }
+        // un nom avec espace ne peut pas être saisi comme argument : on ne le propose pas
+        val names = runCatching { McpServers.readConfigs(cwd) }.getOrDefault(emptyList())
+            .filter { Regex("""\S+""").matches(it.name) }.distinctBy { it.name }.associate { it.name to it.scope.title }
+        mcpCache = Triple(System.currentTimeMillis(), cwd, names)
+        return names
+    }
+
+    private fun showSlashArgPopup(arg: SlashToken.Arg, options: List<Pair<String, String>>) {
+        mentionPopup?.cancel(); mentionPopup = null
+        // valeur déjà saisie en entier : inutile de la reproposer (Entrée doit envoyer, pas compléter)
+        if (options.singleOrNull()?.first.equals(arg.query, ignoreCase = true)) return
+        val rows = options.map { (v, d) -> CompletionRow(if (d.isBlank()) v else "$v — ${d.take(70)}", value = v) }
+        showCompletion(rows) { value ->
+            val t = input.text
+            val end = input.caretPosition.coerceAtMost(t.length)
+            input.text = t.substring(0, arg.start) + value + " " + t.substring(end)
+            input.caretPosition = (arg.start + value.length + 1).coerceAtMost(input.document.length)
+        }
     }
 
     private fun showSlashPopup(query: String) {

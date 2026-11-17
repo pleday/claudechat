@@ -54,6 +54,13 @@ class VectorsTest {
             "mentionsActive" to { i -> i.asJsonObject.let { o -> Mentions.activeToken(o["text"].asString, o["caret"].asInt)?.let { mapOf("start" to it.first, "query" to it.second) } } },
             "slashActive" to { i -> i.asJsonObject.let { SlashToken.activeQuery(it["text"].asString, it["caret"].asInt) } },
             "slashFilter" to { i -> i.asJsonObject.let { SlashToken.filter(it["query"].asString, it["commands"].asJsonArray.strings()) } },
+            "slashArg" to { i -> i.asJsonObject.let { o -> SlashToken.activeArg(o["text"].asString, o["caret"].asInt)?.let { mapOf("command" to it.command, "index" to it.index, "start" to it.start, "query" to it.query) } } },
+            "slashArgOptions" to { i ->
+                i.asJsonObject.let { o ->
+                    val spec = o["spec"]?.takeIf { it.isJsonArray }?.asJsonArray?.map { t -> t.asJsonObject.entrySet().associate { it.key to it.value.asString } }
+                    SlashArgs.suggest(spec, o["index"].asInt, o["query"].asString).map { listOf(it.first, it.second) }
+                }
+            },
             "toolSummary" to { i -> i.asJsonObject.let { toolSummary(it["name"].asString, it["input"].asJsonObject) } },
             "describeTool" to { i -> i.asJsonObject.let { describeTool(it["name"].asString, it["input"].asJsonObject) } },
             "formatDuration" to { i -> formatDuration(i.asLong) },
