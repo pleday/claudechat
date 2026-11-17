@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.5/claude-chat-0.9.5.zip" version="0.9.5">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.6/claude-chat-0.9.6.zip" version="0.9.6">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Fichiers modifiés par Claude</b> : moins de bruit. Les fichiers écrits dans un dossier temporaire (<code>/tmp</code>, scratchpad de Claude), dans <code>.claude/worktrees</code> ou dans un dossier généré (<code>build</code>, <code>node_modules</code>…) ne sont plus listés, et les worktrees ne sont plus parcourus par la détection des changements faits par les commandes</li>
+<li><b>Commandes <code>/</code> de la CLI</b> : la réponse des commandes locales (<code>/context</code>, <code>/cost</code>, <code>/usage</code>, <code>/help</code>…) s'affiche enfin dans la conversation ; elle était perdue, d'où l'impression que « rien ne se passe »</li>
+<li><b>Commandes gérées par le plugin</b> : <code>/mcp</code> ouvre l'écran des serveurs MCP, <code>/clear</code> démarre une nouvelle conversation, <code>/model &lt;nom&gt;</code> et <code>/effort &lt;niveau&gt;</code> règlent les sélecteurs du plugin (la CLI ne les appliquait qu'à un processus relancé à chaque message)</li>
+<li><b>Suggestions d'arguments</b> : après <code>/model </code>, <code>/effort </code>, <code>/mcp </code> (actions, puis serveurs configurés) et <code>/advisor </code>, la complétion propose les valeurs possibles</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
