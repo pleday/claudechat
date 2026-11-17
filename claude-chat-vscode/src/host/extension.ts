@@ -3,7 +3,8 @@ import * as vscode from 'vscode';
 import type { ChangedFile } from '../core/changes';
 import { DEFAULT_MODEL } from '../core/constants';
 import { RemoteBridge } from '../core/remote';
-import { loadSession } from '../core/sessions';
+import { listSessions, loadSession } from '../core/sessions';
+import { parseSessionLink, type SessionLink } from '../core/sessionLink';
 import { SLASH_PROMPTS } from '../core/textTools';
 import { ChangesView } from './changesView';
 import { ChatHost, cliPath, currentEditor, projectDir, trackEditors, type Services } from './chatHost';
@@ -24,6 +25,7 @@ export function activate(context: vscode.ExtensionContext): TestApi {
   const hosts = new Set<ChatHost>();
   let sidebar: ChatHost | undefined;
   let active: ChatHost | undefined;
+  const panels = new Map<ChatHost, vscode.WebviewPanel>();
 
   const svc: Services = {
     context, remote, proposals, before, changes,
@@ -63,10 +65,11 @@ export function activate(context: vscode.ExtensionContext): TestApi {
     });
     panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'claude.svg');
     hosts.add(host);
+    panels.set(host, panel);
     host.bind(panel.webview, (t) => { panel.title = t; });
     svc.activate(host);
     panel.onDidChangeViewState((e) => { if (e.webviewPanel.active) svc.activate(host); });
-    panel.onDidDispose(() => { hosts.delete(host); if (active === host) active = sidebar; host.dispose(); });
+    panel.onDidDispose(() => { hosts.delete(host); panels.delete(host); if (active === host) active = sidebar; host.dispose(); });
     return host;
   };
 
@@ -77,6 +80,26 @@ export function activate(context: vscode.ExtensionContext): TestApi {
     for (let i = 0; i < 40 && !sidebar; i++) await new Promise((r) => setTimeout(r, 50));
     return getSidebar();
   };
+
+  /** Montre la conversation d'une session : son onglet (ou la vue latérale) si elle est ouverte, sinon elle est chargée dans un nouvel onglet. */
+  async function showSession(link: SessionLink): Promise<void> {
+    const open = [...hosts].find((h) => h.session.session.id === link.id);
+    if (open) {
+      const panel = panels.get(open);
+      if (panel) panel.reveal(undefined, false); else await vscode.commands.executeCommand('claudeChat.chat.focus');
+      return;
+    }
+    const known = await listSessions(link.cwd ?? projectDir(), 0, Number.MAX_SAFE_INTEGER, true);
+    const info = known.find((i) => i.id === link.id);
+    if (!info) { void vscode.window.showWarningMessage(`Claude Chat : la session ${link.id} est introuvable dans ce projet.`); return; }
+    const tab = openTab();
+    await tab.session.loadSession(await loadSession(info));
+  }
+
+  // Lien `vscode://pleday.claude-chat-vscode/session?id=…` : ouvre la bonne conversation depuis une autre application.
+  context.subscriptions.push(vscode.window.registerUriHandler({
+    handleUri: (uri) => { const link = parseSessionLink(uri.path, uri.query); if (link) void showSession(link); },
+  }));
 
   async function openSessions(h: ChatHost): Promise<void> {
     const pick = await pickSession(projectDir());

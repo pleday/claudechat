@@ -2,7 +2,7 @@
   "name": "claude-chat-vscode",
   "displayName": "Claude Chat",
   "description": "Interface graphique pour Claude Code (CLI claude) : conversation en streaming, cartes d'outils, approbation des actions, diff modifiable, sessions reprenables, MCP, message de commit.",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "publisher": "pleday",
   "license": "MIT",
   "private": true,
@@ -20,7 +20,9 @@
   ],
   "icon": "media/icon.png",
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onUri"
+  ],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
