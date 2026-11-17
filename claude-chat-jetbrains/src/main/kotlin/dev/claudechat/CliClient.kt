@@ -187,7 +187,12 @@ class CliTurn(private val o: TurnOptions, private val content: JsonArray, privat
                     "stream_event" -> stream(j["event"].asJsonObject)
                     "assistant" -> j["message"]?.asJsonObject?.get("content")?.takeIf { it.isJsonArray }?.asJsonArray?.forEach { b ->
                         val bo = b.asJsonObject
-                        if (bo["type"]?.asString == "tool_use") l.onToolUse(bo["id"].asString, bo["name"].asString, bo["input"]?.asJsonObject ?: JsonObject())
+                        val type = bo["type"]?.asString
+                        if (type == "tool_use") l.onToolUse(bo["id"].asString, bo["name"].asString, bo["input"]?.asJsonObject ?: JsonObject())
+                        // réponse locale de la CLI (/mcp, /help…) : message complet, sans stream_event, donc à afficher ici
+                        else if (type == "text" && j["message"].asJsonObject["model"]?.asString == "<synthetic>") {
+                            bo["text"]?.asString?.takeIf { it.isNotBlank() }?.let { l.onText(it) }
+                        }
                     }
                     "user" -> {
                         val c = j["message"]?.asJsonObject?.get("content")

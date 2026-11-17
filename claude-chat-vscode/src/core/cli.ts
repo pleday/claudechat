@@ -246,6 +246,8 @@ export class CliTurn {
       case 'assistant':
         if (Array.isArray(j.message?.content)) for (const b of j.message.content) {
           if (b.type === 'tool_use') l.onToolUse?.(b.id, b.name, b.input ?? {});
+          // réponse locale de la CLI (/mcp, /help…) : message complet, sans stream_event, donc à afficher ici
+          else if (b.type === 'text' && j.message.model === '<synthetic>' && typeof b.text === 'string' && b.text.trim()) l.onText?.(b.text);
         }
         break;
       case 'user': {
