@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.9
+
+- **Refus automatiques expliqués** : quand une règle deny des réglages (ou le mode « Sans demande ») refuse un outil, la carte l'explique au lieu d'afficher le seul message de la CLI
+- **Fichiers modifiés** : un `git pull`, un changement de branche, un merge, un rebase ou toute autre commande git qui réécrit l'arbre de travail n'est plus comptée comme un travail de Claude
+
 ## 0.9.8
 
 - **Lien vers une conversation** : `jetbrains://<produit>/claude-chat/<session>[?cwd=<dossier>]` (par exemple `idea jetbrains://idea/claude-chat/<session>`) sélectionne l'onglet qui porte cette session, ou la charge dans un nouvel onglet si elle n'est pas ouverte, et ramène la fenêtre du projet au premier plan. Sert aux outils externes qui veulent montrer une conversation précise

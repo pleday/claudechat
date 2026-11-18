@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.8
+
+- **Refus automatiques expliqués** : quand une règle deny des réglages (ou le mode « Sans demande ») refuse un outil, la carte l'explique au lieu d'afficher le seul message de la CLI
+- **Fichiers modifiés** : un `git pull`, un changement de branche, un merge, un rebase ou toute autre commande git qui réécrit l'arbre de travail n'est plus comptée comme un travail de Claude
+
 ## 0.9.7
 
 - **Lien vers une conversation** : `vscode://pleday.claude-chat-vscode/session?id=<session>[&cwd=<dossier>]` affiche l'onglet (ou la vue latérale) qui porte cette session, ou la charge dans un nouvel onglet si elle n'est pas ouverte. Sert aux outils externes qui veulent ramener une conversation à l'écran (`code --open-url <lien>`)
