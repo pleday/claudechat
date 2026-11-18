@@ -198,11 +198,12 @@ export function chunkText(text: string, max = 3800): string[] {
   return out;
 }
 
-/** Aperçu de la file d'attente : dernier message empilé (une ligne) et nombre des autres. */
+/** Aperçu de la file d'attente : dernier message empilé (ses 3 premières lignes, retours à la ligne conservés) et nombre des autres. */
 export function queuePreview(queue: string[], max = 80): string {
-  const last = queue.at(-1)?.split('\n').find((l) => l.trim())?.trim();
-  if (!last) return '';
-  const short = last.length > max ? last.slice(0, max - 1) + '…' : last;
+  const lines = queue.at(-1)?.trim().split('\n').map((l) => l.trimEnd());
+  if (!lines?.length || !lines[0]) return '';
+  const cut = (l: string) => (l.length > max ? l.slice(0, max - 1) + '…' : l);
+  const short = lines.slice(0, 3).map(cut).join('\n') + (lines.length > 3 ? ' …' : '');
   return queue.length > 1 ? `${short}  (+${queue.length - 1} autre${queue.length > 2 ? 's' : ''})` : short;
 }
 

@@ -250,10 +250,12 @@ object QuotaProbeGate {
     fun finish() = running.set(false)
 }
 
-/** Aperçu de la file d'attente : dernier message empilé (une ligne) et nombre des autres. */
+/** Aperçu de la file d'attente : dernier message empilé (ses 3 premières lignes, retours à la ligne conservés) et nombre des autres. */
 fun queuePreview(queue: List<String>, max: Int = 80): String {
-    val last = queue.lastOrNull()?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim() ?: return ""
-    val short = if (last.length > max) last.take(max - 1) + "…" else last
+    val lines = queue.lastOrNull()?.trim()?.lines()?.map { it.trimEnd() } ?: return ""
+    if (lines.isEmpty() || lines[0].isEmpty()) return ""
+    val cut = { l: String -> if (l.length > max) l.take(max - 1) + "…" else l }
+    val short = lines.take(3).joinToString("\n", transform = cut) + if (lines.size > 3) " …" else ""
     return if (queue.size > 1) "$short  (+${queue.size - 1} autre${if (queue.size > 2) "s" else ""})" else short
 }
 

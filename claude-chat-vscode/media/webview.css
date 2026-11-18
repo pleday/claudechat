@@ -96,7 +96,7 @@ input:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
 
 #queue { font-size: .92em; color: var(--vscode-descriptionForeground); }
 .qhead { display: flex; justify-content: space-between; gap: 8px; }
-.qlabel { cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qlabel { cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: pre-wrap; word-break: break-word; }
 .qitem { display: flex; gap: 8px; padding-left: 12px; }
 .qtext { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

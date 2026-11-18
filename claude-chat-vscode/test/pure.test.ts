@@ -182,7 +182,7 @@ describe('outils, quotas, durées', () => {
     expect(formatDuration(7_200_000)).toBe('2 h');
   });
   it('file d\'attente, découpage, avertissement', () => {
-    expect(queuePreview(['a', 'b\nsuite'])).toBe('b  (+1 autre)');
+    expect(queuePreview(['a', 'b\nsuite'])).toBe('b\nsuite  (+1 autre)');
     expect(queuePreview([])).toBe('');
     const l = [1, 2, 3, 4]; expect(moveItem(l, 0, 2)).toBe(2); expect(l).toEqual([2, 3, 1, 4]); expect(moveItem(l, 9, 0)).toBe(9);
     const parts = chunkText(('mot '.repeat(50) + '\n').repeat(5), 120);

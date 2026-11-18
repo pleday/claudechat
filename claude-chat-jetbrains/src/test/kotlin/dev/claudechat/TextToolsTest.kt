@@ -182,7 +182,8 @@ class QueueToolsTest {
     }
 
     @Test fun previewTruncatesAndKeepsFirstLine() {
-        assertEquals("ligne un", queuePreview(listOf("\nligne un\nligne deux")))
+        assertEquals("ligne un\nligne deux", queuePreview(listOf("\nligne un\nligne deux")))
+        assertEquals("1\n2\n3 …", queuePreview(listOf("1\n2\n3\n4")))
         assertTrue(queuePreview(listOf("x".repeat(200)), 20).length <= 20)
     }
 

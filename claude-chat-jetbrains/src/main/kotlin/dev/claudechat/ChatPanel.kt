@@ -1627,7 +1627,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun updateQueue() {
         queueRow.isVisible = queue.isNotEmpty()
         queueLabel.icon = AllIcons.Actions.MoveDown
-        queueLabel.text = "<html>En attente : ${esc(queuePreview(queue))}</html>"
+        queueLabel.text = "<html>En attente : ${esc(queuePreview(queue)).replace("\n", "<br>")}</html>"
         queueLabel.toolTipText = if (queue.size > 1) "Cliquer pour voir et gérer les ${queue.size} messages en attente" else "Cliquer pour voir le message en attente"
         queueRow.revalidate(); queueRow.repaint()
     }
