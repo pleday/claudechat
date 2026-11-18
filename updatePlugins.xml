@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.9/claude-chat-0.9.9.zip" version="0.9.9">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.10/claude-chat-0.9.10.zip" version="0.9.10">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Refus automatiques expliqués</b> : quand une règle deny des réglages (ou le mode « Sans demande ») refuse un outil, la carte l'explique au lieu d'afficher le seul message de la CLI</li>
-<li><b>Fichiers modifiés</b> : un <code>git pull</code>, un changement de branche, un merge, un rebase ou toute autre commande git qui réécrit l'arbre de travail n'est plus comptée comme un travail de Claude</li>
+<li><b>Message épinglé</b> : replié, il montre ses 3 premières lignes avec leurs retours à la ligne au lieu d'une seule ligne aplatie</li>
+<li><b>File d'attente</b> : l'aperçu du dernier message en attente garde aussi ses retours à la ligne (3 lignes)</li>
+<li><b>Message de l'utilisateur</b> : dans la conversation, il s'affiche tel que saisi (retours à la ligne et indentation conservés) au lieu d'être passé au rendu Markdown</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
