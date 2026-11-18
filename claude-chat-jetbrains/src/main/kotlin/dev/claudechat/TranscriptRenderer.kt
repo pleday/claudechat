@@ -30,6 +30,8 @@ class TranscriptRenderer(private val cwd: () -> String) {
 
     private fun hex(c: Color) = "#%02x%02x%02x".format(c.red, c.green, c.blue)
     private fun esc(s: String) = StringUtil.escapeXmlEntities(s)
+    /** Message de l'utilisateur tel que saisi : texte brut, retours à la ligne et indentation conservés (comme dans VS Code). */
+    private fun plainHtml(s: String) = esc(s.trim('\n', '\r')).replace("\r\n", "\n").replace("\n", "<br/>").replace("  ", "&nbsp; ").replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
 
     fun build(entries: List<Entry>, o: Options, t: Theme): Result {
         val sb = StringBuilder()
@@ -60,7 +62,7 @@ class TranscriptRenderer(private val cwd: () -> String) {
                         e.thumbs.take(MAX_THUMBS).forEach { sb.append("<img src=\"${java.io.File(it.path).toURI()}\" width=\"${it.w}\" height=\"${it.h}\" border=\"0\"> ") }
                         if (e.thumbs.size > MAX_THUMBS) sb.append("<font size='-1'>+${e.thumbs.size - MAX_THUMBS}</font>")
                     }
-                    if (e.text.isNotBlank()) sb.append("<br/>").append(renders.render(e, e.text) { Md.toHtml(e.text) })
+                    if (e.text.isNotBlank()) sb.append("<br/>").append(renders.render(e, e.text) { plainHtml(e.text) })
                     sb.append("</td></tr></table></td></tr></table>")
                 }
                 else -> {
