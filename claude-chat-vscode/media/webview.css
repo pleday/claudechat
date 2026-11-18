@@ -21,8 +21,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tb:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 
 /* message épinglé */
-#sticky { padding: 3px 10px; background: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textLink-foreground); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-textLink-foreground); }
-#sticky.open { white-space: pre-wrap; max-height: 40vh; overflow: auto; }
+#sticky { display: flex; gap: 4px; padding: 3px 10px; background: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textLink-foreground); cursor: pointer; overflow: hidden; color: var(--vscode-textLink-foreground); }
+#sticky .pin { flex: none; }
+/* replié : les 3 premières lignes du message, retours à la ligne conservés */
+#sticky .stext { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: pre-wrap; word-break: break-word; }
+#sticky.open { max-height: 40vh; overflow: auto; }
+#sticky.open .stext { display: block; overflow: visible; }
 #sticky .stext { color: var(--vscode-foreground); }
 
 #search { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--vscode-editorWidget-background); }

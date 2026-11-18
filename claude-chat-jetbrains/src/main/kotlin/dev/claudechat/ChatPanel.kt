@@ -214,6 +214,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
     private val stickyText = JBTextArea().apply {
         isEditable = false; lineWrap = true; wrapStyleWord = true
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) { if (!stickyOpen) { stickyOpen = true; applySticky() } }
+        })
         font = JBUI.Fonts.smallFont()
         isOpaque = false
         border = JBUI.Borders.empty(0, 24, 4, 6)
@@ -2087,17 +2091,18 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         stickyBar.isVisible = c != null
         if (c == null) return
         stickyLabel.icon = if (stickyOpen) AllIcons.General.ArrowDown else AllIcons.General.ArrowRight
-        // déplié, le message entier est dans la zone de texte : le libellé ne le répète pas (sinon la 1re ligne apparaîtrait deux fois)
-        stickyLabel.text = if (stickyOpen) (if (c.resumedWith != null) "↻ Votre message (reprise demandée)" else "Votre message")
-        else (if (c.resumedWith != null) "↻ " else "") + c.prompt.replace(Regex("\\s+"), " ").trim()
-        stickyScroll.isVisible = stickyOpen
-        if (stickyOpen) {
-            val text = c.prompt + (c.resumedWith?.let { "\n\n↻ Dernier message : ${it.trim()}" } ?: "")
-            stickyText.text = text; stickyText.caretPosition = 0
-            // hauteur selon la longueur (lignes estimées), plafonnée : au-delà, ascenseur
-            val lines = text.lines().sumOf { 1 + it.length / 80 }.coerceIn(1, 9)
-            stickyScroll.preferredSize = java.awt.Dimension(0, lines * stickyText.getFontMetrics(stickyText.font).height + JBUI.scale(8))
-        }
+        stickyLabel.text = if (c.resumedWith != null) "↻ Votre message (reprise demandée)" else "Votre message"
+        // replié : un aperçu des premières lignes, mise en page (retours à la ligne) conservée ; déplié : le message entier
+        val full = c.prompt.trim() + (c.resumedWith?.let { "\n\n↻ Dernier message : ${it.trim()}" } ?: "")
+        val allLines = full.lines()
+        val text = if (stickyOpen || allLines.size <= STICKY_PREVIEW_LINES) full
+        else allLines.take(STICKY_PREVIEW_LINES).joinToString("\n") + " …"
+        stickyScroll.isVisible = true
+        stickyText.text = text; stickyText.caretPosition = 0
+        // hauteur selon la longueur (lignes estimées), plafonnée : au-delà, ascenseur
+        val cap = if (stickyOpen) 9 else STICKY_PREVIEW_LINES
+        val lines = text.lines().sumOf { 1 + it.length / 80 }.coerceIn(1, cap)
+        stickyScroll.preferredSize = java.awt.Dimension(0, lines * stickyText.getFontMetrics(stickyText.font).height + JBUI.scale(8))
         stickyBar.revalidate(); stickyBar.repaint()
     }
 
@@ -2127,6 +2132,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     companion object {
+        private const val STICKY_PREVIEW_LINES = 3
         /** Couleurs des messages de l'utilisateur : la conversation et le message épinglé en haut doivent rester identiques. */
         val USER_BG = JBColor(Color(0xE8F0FE), Color(0x2D3748))
         val USER_ACCENT = JBColor(Color(0x2F6FDE), Color(0x6EA8FE))
