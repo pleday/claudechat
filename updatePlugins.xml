@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.8/claude-chat-0.9.8.zip" version="0.9.8">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.9/claude-chat-0.9.9.zip" version="0.9.9">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Lien vers une conversation</b> : <code>jetbrains://&lt;produit&gt;/claude-chat/&lt;session&gt;[?cwd=&lt;dossier&gt;]</code> (par exemple <code>idea jetbrains://idea/claude-chat/&lt;session&gt;</code>) sélectionne l'onglet qui porte cette session, ou la charge dans un nouvel onglet si elle n'est pas ouverte, et ramène la fenêtre du projet au premier plan. Sert aux outils externes qui veulent montrer une conversation précise</li>
+<li><b>Refus automatiques expliqués</b> : quand une règle deny des réglages (ou le mode « Sans demande ») refuse un outil, la carte l'explique au lieu d'afficher le seul message de la CLI</li>
+<li><b>Fichiers modifiés</b> : un <code>git pull</code>, un changement de branche, un merge, un rebase ou toute autre commande git qui réécrit l'arbre de travail n'est plus comptée comme un travail de Claude</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
