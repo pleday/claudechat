@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.10
+
+- **Message épinglé** : replié, il montre ses 3 premières lignes avec leurs retours à la ligne au lieu d'une seule ligne aplatie
+- **File d'attente** : l'aperçu du dernier message en attente garde aussi ses retours à la ligne (3 lignes)
+- **Message de l'utilisateur** : dans la conversation, il s'affiche tel que saisi (retours à la ligne et indentation conservés) au lieu d'être passé au rendu Markdown
+
 ## 0.9.9
 
 - **Refus automatiques expliqués** : quand une règle deny des réglages (ou le mode « Sans demande ») refuse un outil, la carte l'explique au lieu d'afficher le seul message de la CLI
