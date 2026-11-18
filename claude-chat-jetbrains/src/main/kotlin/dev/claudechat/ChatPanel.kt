@@ -404,6 +404,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     )
     private val changeExec = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "claude-changes").apply { isDaemon = true } }
     private val commandStarts = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    // commandes git qui réécrivent l'arbre de travail (pull, checkout…) : leurs fichiers ne sont pas attribués à Claude
+    private val gitTreeCommands = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val pendingScan = java.util.concurrent.atomic.AtomicReference<Pair<Long, Long>?>(null)
     @Volatile private var changedFiles: List<ChangedFile> = emptyList()
     // Pastille des fichiers modifiés par Claude, au-dessus de la carte de saisie (voir updateHints). Même style que les pièces jointes.
@@ -980,6 +982,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             // état du fichier avant que l'outil s'exécute : lu tout de suite, sans attendre le passage sur l'EDT
             changeTracker.beforeEdit(name, input)
             if (isCommandTool(name)) commandStarts[id] = System.currentTimeMillis()
+            if (rewritesWorkingTree(name, input)) gitTreeCommands.add(id)
             onToolUseUi(gen, id, name, input)
         }
         private fun onToolUseUi(gen: Int, id: String, name: String, input: JsonObject) = ui(gen) {
@@ -989,7 +992,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
         override fun onToolResult(id: String, text: String, isError: Boolean) {
             // une commande vient de se terminer : on cherche ce qu'elle a changé (fenêtre = durée de son exécution)
-            commandStarts.remove(id)?.let { requestCommandScan(it, System.currentTimeMillis()) }
+            commandStarts.remove(id)?.let {
+                if (gitTreeCommands.remove(id)) changeExec.execute { runCatching { fsBaseline.capture() }.onFailure { LOG.warn("Photo du projet impossible : $it") } }
+                else requestCommandScan(it, System.currentTimeMillis())
+            }
             onToolResultUi(gen, id, text, isError)
         }
         private fun onToolResultUi(gen: Int, id: String, text: String, isError: Boolean) = ui(gen) {

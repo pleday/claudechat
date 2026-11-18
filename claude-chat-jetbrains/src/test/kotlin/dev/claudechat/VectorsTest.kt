@@ -76,6 +76,7 @@ class VectorsTest {
             "modelResolve" to { i -> ModelCatalog.reset(); ModelCatalog.resolve(i.asString) },
             "lineCount" to { i -> LineDiff.lineCount(i.asString) },
             "ignoredPath" to { i -> i.asJsonObject.let { isIgnoredPath(it["path"].asString, it["root"].asString) } },
+            "rewritesWorkingTree" to { i -> i.asJsonObject.let { rewritesWorkingTree(it["name"].asString, it["input"].asJsonObject) } },
         ),
         "cli-parsing" to mapOf(
             "rateLimits" to { i ->

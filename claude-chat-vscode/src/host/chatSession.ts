@@ -15,7 +15,7 @@ import { MCP_SCOPES, readConfigs } from '../core/mcp';
 import { SlashCatalog } from '../core/slashCatalog';
 import {
   busyWarning, describeTool, EDIT_TOOLS, EFFORTS, expandSlash, filePathOf, formatDuration, Fuzzy, isCommandTool, Mentions, moveItem, Quota,
-  QuotaGuard, toolSummary,
+  QuotaGuard, rewritesWorkingTree, toolSummary,
 } from '../core/textTools';
 import * as video from '../core/video';
 import type { Attachment, HostMsg, InteractionView, UiState, UsageReport, WebMsg } from '../protocol';
@@ -146,6 +146,8 @@ export class ChatSession implements RemoteSink {
   private baseline: FsBaseline;
   private changeChain: Promise<unknown> = Promise.resolve();
   private commandStarts = new Map<string, number>();
+  // commandes git qui réécrivent l'arbre de travail (pull, checkout…) : leurs fichiers ne sont pas attribués à Claude
+  private gitTreeCommands = new Set<string>();
   private pendingScan?: [number, number];
   changedFiles: ChangedFile[] = [];
 
@@ -600,6 +602,7 @@ export class ChatSession implements RemoteSink {
         // état du fichier avant que l'outil s'exécute : lu tout de suite
         this.tracker.beforeEdit(name, input);
         if (isCommandTool(name)) this.commandStarts.set(id, Date.now());
+        if (rewritesWorkingTree(name, input)) this.gitTreeCommands.add(id);
         ui(() => {
           this.openKind = undefined;
           if (!this.session.entries.some((e) => e.toolId === id)) this.addEntry({ kind: 'tool', toolId: id, toolName: name, input, model: this.activeModel });
@@ -608,7 +611,11 @@ export class ChatSession implements RemoteSink {
       onToolResult: (id, text, isError) => {
         if (gen !== this.generation) return;
         const started = this.commandStarts.get(id);
-        if (started !== undefined) { this.commandStarts.delete(id); this.requestCommandScan(started, Date.now()); }
+        if (started !== undefined) {
+          this.commandStarts.delete(id);
+          if (this.gitTreeCommands.delete(id)) this.chain(async () => { await this.baseline.capture(); });
+          else this.requestCommandScan(started, Date.now());
+        }
         ui(() => {
           const i = this.session.entries.findIndex((e) => e.toolId === id);
           if (i < 0) return;

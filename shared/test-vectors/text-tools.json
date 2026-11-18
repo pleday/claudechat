@@ -1181,5 +1181,88 @@
    },
    "out": "Permission to use Bash with command ls has been denied."
   }
+ ],
+ "rewritesWorkingTree": [
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "git pull"
+    }
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "git checkout feature/x"
+    }
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "cd app && git switch main"
+    }
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "git -C /tmp/x merge dev"
+    }
+   },
+   "out": true
+  },
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "git status"
+    }
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "git log --oneline"
+    }
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "echo digit pull"
+    }
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "name": "Bash",
+    "input": {
+     "command": "npm run build"
+    }
+   },
+   "out": false
+  },
+  {
+   "in": {
+    "name": "Edit",
+    "input": {
+     "command": "git pull"
+    }
+   },
+   "out": false
+  }
  ]
 }

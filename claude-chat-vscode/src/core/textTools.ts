@@ -117,6 +117,16 @@ export function filePathOf(i: Json): string | undefined {
 export const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit']);
 export const isCommandTool = (name: string) => name === 'Bash' || name === 'Task' || name === 'Agent' || name.startsWith('mcp__');
 
+const GIT_TREE_CMD = /(?:^|[\s;&|(])git\s+(?:(?:-C|-c)\s+\S+\s+|--\S+\s+)*(?:pull|checkout|switch|merge|rebase|reset|stash|cherry-pick|revert|restore|am)\b/;
+
+/**
+ * Vrai si l'appel est une commande git qui réécrit l'arbre de travail (pull, changement de branche, merge, rebase…).
+ * Les fichiers qu'elle touche viennent du dépôt, pas d'un travail de Claude : on ne les compte pas comme modifiés.
+ */
+export function rewritesWorkingTree(name: string, i: Json): boolean {
+  return name === 'Bash' && GIT_TREE_CMD.test(s(i, 'command') ?? '');
+}
+
 export { EFFORTS, PERMISSION_MODES, SLASH_PROMPTS };
 
 

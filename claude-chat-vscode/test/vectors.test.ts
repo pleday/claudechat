@@ -13,7 +13,7 @@ import { listSessions, loadSession, paths, projectDir } from '../src/core/sessio
 import { SlashCatalog } from '../src/core/slashCatalog';
 import { isResume, pickSticky } from '../src/core/stickyPrompt';
 import {
-  busyWarning, chunkText, describeTool, explainAutoDenial, formatDuration, Fuzzy, Mentions, queuePreview, Quota, QuotaGuard, SlashArgs, SlashToken, toolSummary,
+  busyWarning, chunkText, describeTool, explainAutoDenial, formatDuration, Fuzzy, Mentions, queuePreview, Quota, QuotaGuard, rewritesWorkingTree, SlashArgs, SlashToken, toolSummary,
 } from '../src/core/textTools';
 import { tmp } from './helpers';
 
@@ -59,6 +59,7 @@ const handlers: Record<string, Record<string, Handler>> = {
     modelResolve: (i) => catalog().resolve(i),
     lineCount: (i) => lineCount(i),
     ignoredPath: (i) => isIgnoredPath(i.path, i.root),
+    rewritesWorkingTree: (i) => rewritesWorkingTree(i.name, i.input),
   },
   'cli-parsing': {
     rateLimits: (i) => parseRateLimits(i) ?? null,

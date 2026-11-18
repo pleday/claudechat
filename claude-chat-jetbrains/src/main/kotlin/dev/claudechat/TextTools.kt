@@ -116,6 +116,15 @@ fun toolSummary(name: String, i: JsonObject): String {
     }
 }
 
+private val GIT_TREE_CMD = Regex("""(?:^|[\s;&|(])git\s+(?:(?:-C|-c)\s+\S+\s+|--\S+\s+)*(?:pull|checkout|switch|merge|rebase|reset|stash|cherry-pick|revert|restore|am)\b""")
+
+/**
+ * Vrai si l'appel est une commande git qui réécrit l'arbre de travail (pull, changement de branche, merge, rebase…).
+ * Les fichiers qu'elle touche viennent du dépôt, pas d'un travail de Claude : on ne les compte pas comme modifiés.
+ */
+fun rewritesWorkingTree(name: String, i: JsonObject): Boolean =
+    name == "Bash" && GIT_TREE_CMD.containsMatchIn(i["command"]?.takeIf { it.isJsonPrimitive }?.asString ?: "")
+
 /** Description détaillée d'une action à approuver (IDE et téléphone). */
 fun describeTool(name: String, i: JsonObject): String {
     fun s(k: String) = i[k]?.takeIf { it.isJsonPrimitive }?.asString
