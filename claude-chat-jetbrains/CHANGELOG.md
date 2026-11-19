@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.11
+
+- **Protection de quota** : active un verrouillage automatique quand le quota 5 h ou hebdomadaire est épuisé ; la réponse en cours s'arrête et les nouveaux envois sont bloqués. Avec la reprise automatique, la conversation repart au reset du quota sans désactiver la protection.
+- **Icône de protection** : bouclier natif assorti aux icônes de l'IDE.
+
 ## 0.9.10
 
 - **Message épinglé** : replié, il montre ses 3 premières lignes avec leurs retours à la ligne au lieu d'une seule ligne aplatie
