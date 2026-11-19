@@ -42,6 +42,8 @@ export interface UiState {
   contextFile: string;
   remoteOn: boolean;
   autoResumeOn: boolean;
+  quotaGuardOn: boolean;
+  sessionLocked: boolean;
   canFork: boolean;
   forkPending: boolean;
   battery: { remaining: number | null; tip: string };
@@ -102,6 +104,7 @@ export type WebMsg =
   | { t: 'toggleContext' }
   | { t: 'toggleRemote' }
   | { t: 'toggleAutoResume' }
+  | { t: 'toggleQuotaGuard' }
   | { t: 'interact'; id: string; choice: string }
   | { t: 'viewDiff'; id: string }
   | { t: 'attachFiles' }

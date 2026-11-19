@@ -89,6 +89,60 @@ describe('ChatSession', () => {
     s.dispose();
   });
 
+  it('arme la protection sans bloquer quand le quota n’est pas épuisé', async () => {
+    const d = tmp();
+    const cli = fakeCli(d, `${PRE}\n${INIT}\n${RESULT}`);
+    const { env, ui } = makeEnv(d, cli);
+    const s = new ChatSession(env);
+    await s.onMessage({ t: 'toggleQuotaGuard' });
+    expect(ui().quotaGuardOn).toBe(true);
+    expect(ui().sessionLocked).toBe(false);
+    await s.onMessage({ t: 'send', text: 'autorisé' });
+    await until(() => !s.isStreaming && s.session.entries.some((e) => e.kind === 'user'), 'envoi après déverrouillage');
+    expect(s.session.entries[0]).toMatchObject({ kind: 'user', text: 'autorisé' });
+    s.dispose();
+  });
+
+  it('interrompt une réponse et bloque les envois quand le quota est épuisé', async () => {
+    const d = tmp();
+    const cli = fakeCli(d, `${PRE}\n${INIT}\nwhile read -r x; do case "$x" in *interrupt*) exit 0;; esac; done`);
+    const { env, ui, state } = makeEnv(d, cli);
+    const s = new ChatSession(env);
+    await s.onMessage({ t: 'send', text: 'en cours' });
+    await until(() => s.isStreaming && s.session.id === 'sid-42', 'démarrage de la réponse');
+    const now = Math.floor(Date.now() / 1000);
+    state.set('rlFiveUtil', 1);
+    state.set('rlFiveReset', now + 3600);
+    await s.onMessage({ t: 'toggleQuotaGuard' });
+    expect(ui().quotaGuardOn).toBe(true);
+    await until(() => !s.isStreaming, 'arrêt au quota épuisé');
+    expect(ui().sessionLocked).toBe(true);
+    expect(ui().quotaGuardOn).toBe(true);
+    expect(s.session.entries.at(-1)).toMatchObject({ kind: 'notice', text: 'Réponse interrompue.' });
+    await s.onMessage({ t: 'send', text: 'bloqué' });
+    expect(s.session.entries.filter((e) => e.kind === 'user')).toHaveLength(1);
+    s.dispose();
+  });
+
+  it('déverrouille après la reprise automatique au reset et garde la protection armée', async () => {
+    const d = tmp();
+    const cli = fakeCli(d, `${PRE}\n${INIT}\n${RESULT}`);
+    const { env, ui, state } = makeEnv(d, cli, {}, { autoResume: true, autoResumeDelayMin: 0 });
+    const now = Math.floor(Date.now() / 1000);
+    state.set('rlFiveUtil', 1);
+    state.set('rlFiveReset', now + 1);
+    state.set('rlWeekUtil', 1);
+    state.set('rlWeekReset', now + 2);
+    const s = new ChatSession(env);
+    await s.onMessage({ t: 'toggleQuotaGuard' });
+    expect(ui().sessionLocked).toBe(true);
+    expect(ui().resume).not.toBeNull();
+    await until(() => !s.isStreaming && s.session.entries.some((e) => e.kind === 'user'), 'reprise automatique après le reset');
+    expect(ui().sessionLocked).toBe(false);
+    expect(ui().quotaGuardOn).toBe(true);
+    s.dispose();
+  });
+
   it('joint le fichier mentionné avec @ et expande les raccourcis', async () => {
     const d = tmp();
     writeFileSync(join(d, 'notes.md'), 'contenu secret');

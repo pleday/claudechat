@@ -208,7 +208,7 @@ object QuotaGuard {
     private val looksLikeQuota = Regex("(?i)(usage limit|limit reached|rate.?limit|quota|limit will reset|resets? at)")
     /** Délai par défaut après le début de la session suivante. */
     const val DEFAULT_DELAY_SEC = 120L
-    private const val FALLBACK_SEC = 1800L
+    const val FALLBACK_SEC = 1800L
 
     /** Instant (secondes epoch) où relancer ; null si l'échec n'est pas lié à un quota. */
     fun blockedUntil(l: RateLimits?, message: String?, nowSec: Long, delaySec: Long = DEFAULT_DELAY_SEC): Long? {

@@ -18,6 +18,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const state: UiState = {
   streaming: false, statusText: '', statusTip: '', resume: null, ringPercent: 0, ringTip: '', mode: 'manual', model: '', effort: 'auto',
   efforts: ['auto'], models: [], busyMode: 'refine', contextOn: true, contextFile: '', remoteOn: false, autoResumeOn: false, canFork: false,
+  quotaGuardOn: false, sessionLocked: false,
   forkPending: false, battery: { remaining: null, tip: '' }, usageLine: '', queue: [], changes: null, suggestion: null, attachments: [],
   interaction: null, title: '', slash: [], slashArgs: {}, projectName: '', cwd: '',
 };
@@ -276,6 +277,12 @@ function drawControls(): void {
   ctxBtn.title = state.contextOn ? 'Le fichier ouvert (ou la sélection) est joint au message — cliquer pour désactiver' : 'Contexte de l\'éditeur désactivé — cliquer pour activer';
   $('remoteBtn').classList.toggle('on', state.remoteOn);
   $('resumeBtn').classList.toggle('on', state.autoResumeOn);
+  const lock = $('sessionLockBtn');
+  lock.classList.toggle('on', state.quotaGuardOn);
+  lock.classList.toggle('low', state.sessionLocked);
+  lock.setAttribute('aria-pressed', String(state.quotaGuardOn));
+  lock.title = state.sessionLocked ? 'Quota épuisé : session verrouillée — cliquer pour désactiver la protection' : state.quotaGuardOn ? 'Protection de quota active — verrouillera à l’épuisement du quota' : 'Activer le verrouillage automatique à épuisement du quota';
+  lock.innerHTML = state.quotaGuardOn ? ICONS.shield : ICONS.shieldOutline;
   $('forkBtn').classList.toggle('on', state.forkPending);
   $<HTMLButtonElement>('forkBtn').disabled = !state.canFork && !state.forkPending;
   $('thinkBtn').classList.toggle('on', showThinking);
@@ -313,9 +320,9 @@ function drawBattery(): void {
 function drawSend(): void {
   const hasText = input.value.trim().length > 0 || state.attachments.length > 0;
   const send = $<HTMLButtonElement>('send');
-  send.disabled = !hasText;
+  send.disabled = !hasText || state.sessionLocked;
   const refine = state.busyMode === 'refine';
-  send.title = state.streaming
+  send.title = state.sessionLocked ? 'Session verrouillée — déverrouillez pour envoyer' : state.streaming
     ? (refine ? 'Préciser l\'exécution en cours (Ctrl+Entrée : mettre en file d\'attente)' : 'Mettre en file d\'attente (Ctrl+Entrée : préciser)')
     : 'Envoyer (Entrée)';
   send.innerHTML = state.streaming ? (refine ? ICONS.bolt : ICONS.queue) : ICONS.send;
@@ -455,6 +462,7 @@ function autosize(): void {
 })();
 
 function send(mode?: 'refine' | 'queue'): void {
+  if (state.sessionLocked) return;
   const text = input.value.trim();
   if (!text && !state.attachments.length) return;
   history.add(text);
@@ -618,6 +626,7 @@ on('modelBtn', (b) => {
 on('ctxBtn', () => post({ t: 'toggleContext' }));
 on('remoteBtn', () => post({ t: 'toggleRemote' }));
 on('resumeBtn', () => post({ t: 'toggleAutoResume' }));
+on('sessionLockBtn', () => post({ t: 'toggleQuotaGuard' }));
 on('forkBtn', () => post({ t: 'fork' }));
 on('renameBtn', () => post({ t: 'rename' }));
 on('searchBtn', () => toggleSearch());
@@ -652,7 +661,7 @@ function applyState(p: Partial<UiState>): void {
   Object.assign(state, p);
   if (cwdChanged && entries.length) renderAll(); // les chemins affichés sont raccourcis par rapport au projet
   const has = (...k: Array<keyof UiState>) => k.some((x) => x in p);
-  if (has('mode', 'model', 'effort', 'efforts', 'models', 'busyMode', 'contextOn', 'contextFile', 'remoteOn', 'autoResumeOn', 'canFork', 'forkPending')) drawControls();
+  if (has('mode', 'model', 'effort', 'efforts', 'models', 'busyMode', 'contextOn', 'contextFile', 'remoteOn', 'autoResumeOn', 'quotaGuardOn', 'sessionLocked', 'canFork', 'forkPending')) drawControls();
   if (has('streaming', 'statusText', 'statusTip', 'resume', 'ringPercent', 'ringTip', 'usageLine', 'canFork')) drawStatus();
   if (has('battery')) drawBattery();
   if (has('queue')) drawQueue();

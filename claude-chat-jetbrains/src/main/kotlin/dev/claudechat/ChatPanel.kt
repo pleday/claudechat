@@ -99,8 +99,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private var turnStart = 0L
     private var lastDurationMs = 0L          // durée de la dernière réponse terminée normalement (0 = aucune / en cours)
     private var autoResumeOn = settings.state.autoResume
+    private var quotaGuardOn = false
+    private var sessionLocked = false
     private var lastLimits: RateLimits? = null
     private var resumeAt = 0L
+    private var lockResume = false
     private var resumeAttempts = 0
     private var quotaError: String? = null
     private var popupRef: com.intellij.openapi.ui.popup.JBPopup? = null
@@ -328,8 +331,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         else {
             val tip = if (streaming) {
                 if (busyMode == SendMode.QUEUE) "Mettre en file d'attente (Ctrl+Entrée : préciser)" else "Préciser l'exécution en cours (Ctrl+Entrée : mettre en file d'attente)"
-            } else "Envoyer (Entrée)"
-            sendControl.configure(RoundSendButton.Mode.SEND, !blank, tip, menu) { send() }
+            } else if (sessionLocked) "Session verrouillée — déverrouillez pour envoyer" else "Envoyer (Entrée)"
+            sendControl.configure(RoundSendButton.Mode.SEND, !blank && !sessionLocked, tip, menu) { send() }
         }
     }
 
@@ -666,8 +669,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             add(toggle("Reprendre automatiquement quand le quota est rempli (cet onglet)", AllIcons.Actions.Resume, { autoResumeOn }) {
                 autoResumeOn = it
                 if (!it) cancelResume()
+                else if (sessionLocked && resumeAt == 0L) scheduleLockedResume()
                 render()
             })
+            add(toggle("Verrouiller automatiquement quand le quota est épuisé", AllIcons.Actions.InlaySecuredShield, { quotaGuardOn }) { setQuotaGuard(it) })
             add(toggle("Débloquer à distance depuis le téléphone (cette conversation)", AllIcons.Actions.Share, { remoteOn }) { setRemote(it) })
             add(action("Serveurs MCP", AllIcons.Nodes.Plugin) { showMcpPopup() })
             add(action("Réglages", AllIcons.General.GearPlain) { openSettings() })
@@ -752,7 +757,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun newSession() {
         if (!confirmDiscard("Démarrer une nouvelle conversation interrompt la réponse en cours (la conversation actuelle reste dans l'historique des sessions).", "Interrompre et recommencer")) return
         abandonTurn()
-        suggestion = null; clearChangedFiles(); cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; applyRemote(settings.state.remoteDefault)
+        suggestion = null; clearChangedFiles(); cancelResume(); session = Session(); customTitle = null; welcome.shuffle(); resetUsage(); allowAll = false; quotaGuardOn = false; sessionLocked = false; applyRemote(settings.state.remoteDefault)
         render(forceBottom = true)
         input.requestFocusInWindow()
     }
@@ -760,7 +765,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     fun loadSession(s: Session) {
         if (!confirmDiscard("Charger une autre session interrompt la réponse en cours.", "Interrompre et charger")) return
         abandonTurn()
-        suggestion = null; clearChangedFiles(); cancelResume(); session = s; customTitle = null; allowAll = false; applyRemote(settings.state.remoteDefault)
+        suggestion = null; clearChangedFiles(); cancelResume(); session = s; customTitle = null; allowAll = false; quotaGuardOn = false; sessionLocked = false; applyRemote(settings.state.remoteDefault)
         resetUsage()
         render(forceBottom = true)
     }
@@ -860,6 +865,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     }
 
     private fun send(mode: SendMode = busyMode) {
+        if (sessionLocked) return
         val original = input.text.trim()
         if (original.isEmpty() && extraFiles.isEmpty() && extraImages.isEmpty()) return
         history.add(original)
@@ -894,7 +900,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         render(forceBottom = true)
     }
 
-    private fun dispatch(original: String, fromPhone: Boolean = false) {
+    private fun dispatch(original: String, fromPhone: Boolean = false, allowLocked: Boolean = false) {
+        if (sessionLocked && !allowLocked) return
         val text = expandSlash(original)
         val noAttach = skipAttachOnce
         skipAttachOnce = false
@@ -1029,8 +1036,9 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
     }
 
-    private fun scheduleResume(atMs: Long) {
+    private fun scheduleResume(atMs: Long, fromLock: Boolean = sessionLocked) {
         resumeAt = atMs; resumeAttempts++
+        lockResume = fromLock
         pollResume()
     }
 
@@ -1038,16 +1046,24 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     private fun pollResume() {
         if (resumeAt == 0L) return
         if (!streaming && System.currentTimeMillis() >= resumeAt) {
+            val resumeFromLock = lockResume
             resumeAt = 0
+            lockResume = false
+            if (resumeFromLock && sessionLocked) {
+                sessionLocked = false
+                updateStatus()
+                syncSend()
+            }
             val extra = queue.joinToString("\n\n").also { queue.clear(); updateQueue() }
             session.entries.add(Entry(Kind.NOTICE, "Reprise automatique après réinitialisation du quota…"))
             if (remoteOn) RemoteBridge.notifyPhone("▶ [${project.name}] Reprise automatique de la conversation.")
             skipAttachOnce = true
-            dispatch("Le quota est réinitialisé : reprends ta tâche là où tu t'étais arrêté." + if (extra.isNotEmpty()) "\n\n$extra" else "")
+            dispatch("Le quota est réinitialisé : reprends ta tâche là où tu t'étais arrêté." + if (extra.isNotEmpty()) "\n\n$extra" else "", allowLocked = true)
             return
         }
         updateStatus()
-        alarm.addRequest({ pollResume() }, 30_000)
+        val wait = if (streaming) 30_000L else minOf(30_000L, (resumeAt - System.currentTimeMillis()).coerceAtLeast(1))
+        alarm.addRequest({ pollResume() }, wait)
     }
 
     // ---------- Fichiers modifiés par Claude ----------
@@ -1123,7 +1139,20 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         }
     }
 
-    private fun cancelResume() { resumeAt = 0; resumeAttempts = 0; updateStatus() }
+    private fun cancelResume() { resumeAt = 0; resumeAttempts = 0; lockResume = false; updateStatus() }
+
+    private fun scheduleLockedResume() {
+        val now = System.currentTimeMillis() / 1000
+        val windows = listOfNotNull(fiveHourWindow(), weekWindow())
+        val exhaustedResets = windows
+            .filter { Quota.remainingPercent(it, now) == 0 }
+            .map { it.resetsAt }
+            .filter { it > now }
+        val next = exhaustedResets.maxOrNull() ?: windows.firstOrNull { it.resetsAt > now }?.resetsAt
+        val delay = settings.state.autoResumeDelayMin.coerceAtLeast(0) * 60L
+        val at = if (next != null) (next + delay) * 1000 else System.currentTimeMillis() + QuotaGuard.FALLBACK_SEC * 1000
+        scheduleResume(at, fromLock = true)
+    }
 
     private var hourglassFrame = 0
 
@@ -1148,7 +1177,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         if (resumeAt > 0) {
             val at = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(resumeAt), java.time.ZoneId.systemDefault())
             val left = Quota.remaining(resumeAt / 1000, System.currentTimeMillis() / 1000)
-            statusLabel.text = "⏸ Quota atteint — reprise automatique à ${java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(at)} (dans $left)"
+            statusLabel.text = (if (sessionLocked) "🔒 Session verrouillée · " else "") +
+                "⏸ Quota atteint — reprise automatique à ${java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(at)} (dans $left)"
             return
         }
         statusLabel.text = if (streaming) {
@@ -1159,6 +1189,8 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             model?.let { "$it · contexte ${fmt(liveCtx)} tokens" },
             lastDurationMs.takeIf { it > 0 }?.let { "réponse en ${formatDuration(it)}" },
         ).joinToString(" · ")
+        if (sessionLocked) statusLabel.text = "🔒 Session verrouillée — nouveaux envois bloqués · ${statusLabel.text}"
+        else if (quotaGuardOn) statusLabel.text = "🛡 Protection de quota active · ${statusLabel.text}"
         statusLabel.toolTipText = activeModel?.let { "Modèle utilisé : $it" }
     }
 
@@ -1168,6 +1200,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         settings.state.rlAt = System.currentTimeMillis()
         quotaError = null
         updateQuota()
+        if (quotaGuardOn && quotaExhausted()) lockForQuota()
     }
 
     /** Mesure les quotas hors conversation (au démarrage, ou via « Actualiser »). */
@@ -1186,6 +1219,46 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
 
     private fun fiveHourWindow() = settings.state.takeIf { it.rlFiveUtil >= 0 }?.let { QuotaWindow(it.rlFiveUtil, it.rlFiveReset) }
     private fun weekWindow() = settings.state.takeIf { it.rlWeekUtil >= 0 }?.let { QuotaWindow(it.rlWeekUtil, it.rlWeekReset) }
+    private fun quotaExhausted(): Boolean {
+        val now = System.currentTimeMillis() / 1000
+        return listOfNotNull(fiveHourWindow(), weekWindow()).any { Quota.remainingPercent(it, now) == 0 }
+    }
+
+    private fun setQuotaGuard(armed: Boolean) {
+        quotaGuardOn = armed
+        if (armed && quotaExhausted()) lockForQuota()
+        else if (!armed && sessionLocked) {
+            unlockSession()
+            return
+        } else {
+            updateStatus()
+            if (armed) probeQuota()
+        }
+    }
+
+    private fun lockForQuota() {
+        if (!sessionLocked) {
+            sessionLocked = true
+            updateStatus()
+            syncSend()
+        }
+        if (streaming) stop()
+        if (autoResumeOn && resumeAt == 0L) scheduleLockedResume()
+    }
+
+    private fun unlockSession() {
+        sessionLocked = false
+        if (lockResume) cancelResume()
+        updateStatus()
+        syncSend()
+        if (streaming) return
+        if (resumeAt > 0L) { pollResume(); return }
+        if (queue.isNotEmpty()) {
+            val merged = queue.joinToString("\n\n")
+            queue.clear(); updateQueue()
+            dispatch(merged)
+        }
+    }
 
     /** Batterie = part restante de la fenêtre de 5 h ; même icône sur l'onglet. */
     private fun updateQuota() {
@@ -1293,8 +1366,11 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
         updateStatus()
         clearInteractions("Réponse terminée", deny = false)
         refinedOriginals.clear()
+        val nowSec = System.currentTimeMillis() / 1000
+        val quotaReached = QuotaGuard.blockedUntil(lastLimits, message, nowSec, 0L) != null || quotaExhausted()
+        if (quotaGuardOn && quotaReached) lockForQuota()
         val until = if (isError && !interrupted && autoResumeOn && resumeAttempts < MAX_RESUMES)
-            QuotaGuard.blockedUntil(lastLimits, message, System.currentTimeMillis() / 1000, settings.state.autoResumeDelayMin * 60L) else null
+            QuotaGuard.blockedUntil(lastLimits, message, nowSec, settings.state.autoResumeDelayMin * 60L) else null
         if (!isError) resumeAttempts = 0
         noQuotaLastTurn = !isError && !interrupted && lastLimits == null
         if (noQuotaLastTurn) LOG.info("Aucun rate_limit_event reçu pendant cette réponse")
@@ -1318,7 +1394,7 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
             RemoteBridge.say(phoneSink, "⚠ [${project.name}] Erreur : ${message ?: "inconnue"}")
         }
         render()
-        if (queue.isNotEmpty() && resumeAt == 0L) {
+        if (queue.isNotEmpty() && resumeAt == 0L && !sessionLocked) {
             val merged = queue.joinToString("\n\n"); queue.clear(); updateQueue()
             dispatch(merged)
         }
@@ -1371,6 +1447,10 @@ class ChatPanel(private val project: Project, parent: Disposable) : JPanel(Borde
     /** Message libre reçu du téléphone : devient un message de l'utilisateur (ou attend la fin de la réponse). */
     private fun receivePhone(text: String) {
         if (!remoteOn) return
+        if (sessionLocked) {
+            RemoteBridge.notifyPhone("🔒 Cette session est verrouillée ; le message n’a pas été envoyé.")
+            return
+        }
         if (streaming) {
             queue.add(text); updateQueue()
             RemoteBridge.say(phoneSink, "📨 Claude est encore au travail : ton message est en file d'attente.")

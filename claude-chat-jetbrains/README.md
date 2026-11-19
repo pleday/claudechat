@@ -7,7 +7,7 @@ cartes d'outils, approbation des actions, diff IntelliJ modifiable, sessions de 
 - **Conversation** en streaming, avec cartes d'outils, réflexion, recherche, historique de saisie (↑/↓), pièces jointes (collage d'images, fichiers, vidéos), mentions `@fichier` et commandes `/` de la CLI.
 - **Contrôle** : approbation des actions, plan et questions de Claude (dans l'IDE ou sur le téléphone), diff IntelliJ modifiable avant d'accepter, modes de permission changeables en cours de réponse, messages empilés ou précisions injectées sans interrompre.
 - **Fichiers modifiés par Claude** : la liste des fichiers que Claude a créés, modifiés ou supprimés dans la conversation, par ses outils d'édition comme par des commandes (Bash, sous-agents, outils MCP), s'ouvre dans l'arbre des changements et l'outil de comparaison de l'IDE. Indépendant de git ; vos propres modifications n'y figurent pas.
-- **Suivi** : quotas (batterie de la session de 5 h), détail du contexte au clic sur l'anneau, durée de la réponse, coût, titre de session généré par la CLI, reprise automatique après un quota atteint.
+- **Suivi** : quotas (batterie de la session de 5 h), détail du contexte au clic sur l'anneau, durée de la réponse, coût, titre de session généré par la CLI, reprise automatique après un quota atteint ; protection activable pour verrouiller la session quand le quota 5 h ou hebdomadaire est épuisé. Si la reprise automatique est active, la conversation reprend au prochain reset sans désactiver la protection.
 - **Confort** : message de l'utilisateur épinglé en haut (repli sur la tâche précédente quand on ne fait que dire « continue »), suggestion du message suivant, modèles et efforts lus depuis la CLI, sessions de la CLI reprenables, serveurs MCP.
 
 ## Prérequis

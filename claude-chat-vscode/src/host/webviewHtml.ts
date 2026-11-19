@@ -41,6 +41,7 @@ export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, a
     <span class="tbsep"></span>
     <div class="tbg">
       ${btn('resumeBtn', ICONS.resume, 'Reprendre automatiquement quand le quota est rempli (cette conversation)')}
+      ${btn('sessionLockBtn', ICONS.shieldOutline, 'Activer le verrouillage automatique à épuisement du quota')}
       ${btn('remoteBtn', ICONS.remote, 'Recevoir les demandes sur le téléphone (Telegram) pour cette conversation')}
     </div>
   </div>

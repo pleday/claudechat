@@ -128,7 +128,10 @@ export class ChatSession implements RemoteSink {
 
   private remoteOn = false;
   private autoResumeOn: boolean;
+  private quotaGuardOn = false;
+  private sessionLocked = false;
   private resumeAt = 0;
+  private lockResume = false;
   private resumeAttempts = 0;
   private resumeTimer?: NodeJS.Timeout;
   private titleTimer?: NodeJS.Timeout;
@@ -211,6 +214,8 @@ export class ChatSession implements RemoteSink {
       contextOn: this.contextOn,
       remoteOn: this.remoteOn,
       autoResumeOn: this.autoResumeOn,
+      quotaGuardOn: this.quotaGuardOn,
+      sessionLocked: this.sessionLocked,
     };
   }
 
@@ -299,7 +304,9 @@ export class ChatSession implements RemoteSink {
     }
     return {
       streaming: this.streaming,
-      statusText,
+      statusText: this.sessionLocked
+        ? `🔒 Session verrouillée — nouveaux envois bloqués · ${statusText}`
+        : this.quotaGuardOn ? `🛡 Protection de quota active · ${statusText}` : statusText,
       statusTip: this.activeModel ? `Modèle utilisé : ${this.activeModel}` : '',
       resume,
       ringPercent: percent,
@@ -334,6 +341,7 @@ export class ChatSession implements RemoteSink {
     this.env.setState('rlAt', Date.now());
     this.quotaError = null;
     this.patch(this.quotaState());
+    if (this.quotaGuardOn && this.quotaExhausted()) this.lockForQuota();
   }
 
   private static probing = false;
@@ -399,7 +407,13 @@ export class ChatSession implements RemoteSink {
       case 'setBusyMode': this.busyMode = m.mode; this.env.setState('busyMode', m.mode); this.patch({ busyMode: m.mode }); break;
       case 'toggleContext': this.contextOn = !this.contextOn; this.patch({ contextOn: this.contextOn, contextFile: this.env.editorLabel() }); break;
       case 'toggleRemote': this.setRemote(!this.remoteOn); break;
-      case 'toggleAutoResume': this.autoResumeOn = !this.autoResumeOn; if (!this.autoResumeOn) this.cancelResume(); this.patch({ autoResumeOn: this.autoResumeOn }); break;
+      case 'toggleAutoResume':
+        this.autoResumeOn = !this.autoResumeOn;
+        if (!this.autoResumeOn) this.cancelResume();
+        else if (this.sessionLocked && this.resumeAt === 0) this.scheduleLockedResume();
+        this.patch({ autoResumeOn: this.autoResumeOn });
+        break;
+      case 'toggleQuotaGuard': this.setQuotaGuard(!this.quotaGuardOn); break;
       case 'interact': { const i = this.findInteraction(m.id); if (i) this.resolveLocal(i, m.choice); break; }
       case 'viewDiff': { const i = this.findInteraction(m.id); if (i) void this.showDiff(i.req); break; }
       case 'attachFiles': await this.addFiles(); break;
@@ -471,6 +485,7 @@ export class ChatSession implements RemoteSink {
   // ---------- Envoi ----------
 
   private async send(raw: string, mode: 'refine' | 'queue'): Promise<void> {
+    if (this.sessionLocked) return;
     const original = raw.trim();
     if (!original && !this.files.length && !this.images.length) return;
     if (/^\/mcp$/i.test(original)) { this.env.openMcp(); return; } // écran du plugin : la CLI ne peut pas l'afficher
@@ -501,7 +516,8 @@ export class ChatSession implements RemoteSink {
     }
   }
 
-  private async dispatch(original: string, fromPhone = false): Promise<void> {
+  private async dispatch(original: string, fromPhone = false, allowLocked = false): Promise<void> {
+    if (this.sessionLocked && !allowLocked) return;
     const text = expandSlash(original);
     const noAttach = this.skipAttachOnce;
     this.skipAttachOnce = false;
@@ -652,8 +668,11 @@ export class ChatSession implements RemoteSink {
     this.clearInteractions('Réponse terminée', false);
     this.refinedOriginals.clear();
     const delayMin = this.env.config('autoResumeDelayMin', 2);
+    const nowSec = Date.now() / 1000;
+    const quotaReached = QuotaGuard.blockedUntil(this.lastLimits, message, nowSec, 0) !== undefined || this.quotaExhausted();
+    if (this.quotaGuardOn && quotaReached) this.lockForQuota();
     const until = isError && !this.interrupted && this.autoResumeOn && this.resumeAttempts < MAX_RESUMES
-      ? QuotaGuard.blockedUntil(this.lastLimits, message, Date.now() / 1000, delayMin * 60) : undefined;
+      ? QuotaGuard.blockedUntil(this.lastLimits, message, nowSec, delayMin * 60) : undefined;
     if (!isError) this.resumeAttempts = 0;
     this.noQuotaLastTurn = !isError && !this.interrupted && this.lastLimits === undefined;
     if (isError) {
@@ -675,7 +694,7 @@ export class ChatSession implements RemoteSink {
     } else if (this.remoteOn && !this.interrupted && until === undefined) {
       this.env.remote.say(this, `⚠ [${path.basename(this.cwd())}] Erreur : ${message ?? 'inconnue'}`);
     }
-    if (this.queue.length && this.resumeAt === 0) {
+    if (this.queue.length && this.resumeAt === 0 && !this.sessionLocked) {
       const merged = this.queue.join('\n\n'); this.queue = []; this.sendQueue();
       void this.dispatch(merged);
     }
@@ -704,8 +723,9 @@ export class ChatSession implements RemoteSink {
 
   // ---------- Reprise automatique ----------
 
-  private scheduleResume(atMs: number): void {
+  private scheduleResume(atMs: number, fromLock = this.sessionLocked): void {
     this.resumeAt = atMs; this.resumeAttempts++;
+    this.lockResume = fromLock;
     this.pollResume();
   }
 
@@ -714,19 +734,75 @@ export class ChatSession implements RemoteSink {
     clearTimeout(this.resumeTimer);
     if (this.resumeAt === 0) return;
     if (!this.streaming && Date.now() >= this.resumeAt) {
+      const resumeFromLock = this.lockResume;
       this.resumeAt = 0;
+      this.lockResume = false;
+      if (resumeFromLock && this.sessionLocked) {
+        this.sessionLocked = false;
+        this.patch({ sessionLocked: false, ...this.statusState() });
+      }
       const extra = this.queue.join('\n\n'); this.queue = []; this.sendQueue();
       this.addEntry({ kind: 'notice', text: 'Reprise automatique après réinitialisation du quota…' });
       if (this.remoteOn) this.env.remote.notifyPhone(`▶ [${path.basename(this.cwd())}] Reprise automatique de la conversation.`);
       this.skipAttachOnce = true;
-      void this.dispatch("Le quota est réinitialisé : reprends ta tâche là où tu t'étais arrêté." + (extra ? `\n\n${extra}` : ''));
+      void this.dispatch("Le quota est réinitialisé : reprends ta tâche là où tu t'étais arrêté." + (extra ? `\n\n${extra}` : ''), false, true);
       return;
     }
     this.sendStatus();
-    this.resumeTimer = setTimeout(() => this.pollResume(), 30_000);
+    const wait = this.streaming ? 30_000 : Math.min(30_000, Math.max(1, this.resumeAt - Date.now()));
+    this.resumeTimer = setTimeout(() => this.pollResume(), wait);
   }
 
-  private cancelResume(): void { this.resumeAt = 0; this.resumeAttempts = 0; clearTimeout(this.resumeTimer); this.sendStatus(); }
+  private cancelResume(): void { this.resumeAt = 0; this.resumeAttempts = 0; this.lockResume = false; clearTimeout(this.resumeTimer); this.sendStatus(); }
+
+  private quotaExhausted(): boolean {
+    const now = Date.now() / 1000;
+    return [this.fiveHourWindow(), this.weekWindow()].some((w) => w !== undefined && Quota.remainingPercent(w, now) === 0);
+  }
+
+  private setQuotaGuard(armed: boolean): void {
+    this.quotaGuardOn = armed;
+    if (armed && this.quotaExhausted()) this.lockForQuota();
+    else if (!armed && this.sessionLocked) {
+      this.unlockSession();
+      this.patch({ quotaGuardOn: false });
+    } else {
+      this.patch({ quotaGuardOn: armed, sessionLocked: this.sessionLocked, ...this.statusState() });
+      if (armed) void this.probeQuota();
+    }
+  }
+
+  private lockForQuota(): void {
+    if (!this.sessionLocked) {
+      this.sessionLocked = true;
+      this.patch({ quotaGuardOn: this.quotaGuardOn, sessionLocked: true, ...this.statusState() });
+    }
+    if (this.streaming) this.stop();
+    if (this.autoResumeOn && this.resumeAt === 0) this.scheduleLockedResume();
+  }
+
+  private unlockSession(): void {
+    this.sessionLocked = false;
+    if (this.lockResume) this.cancelResume();
+    this.patch({ sessionLocked: false, ...this.statusState() });
+    if (this.streaming) return;
+    if (this.resumeAt > 0) { this.pollResume(); return; }
+    if (this.queue.length) {
+      const merged = this.queue.join('\n\n'); this.queue = []; this.sendQueue();
+      void this.dispatch(merged);
+    }
+  }
+
+  private scheduleLockedResume(): void {
+    const now = Date.now() / 1000;
+    const windows = [this.fiveHourWindow(), this.weekWindow()].filter((w): w is QuotaWindow => w !== undefined);
+    const exhausted = windows.filter((w) => Quota.remainingPercent(w, now) === 0);
+    const reset = exhausted.map((w) => w.resetsAt).filter((at) => at > now);
+    const next = reset.length ? Math.max(...reset) : windows.find((w) => w.resetsAt > now)?.resetsAt;
+    const delay = Math.max(0, this.env.config('autoResumeDelayMin', 2)) * 60;
+    const at = next !== undefined ? (next + delay) * 1000 : Date.now() + QuotaGuard.FALLBACK_SEC * 1000;
+    this.scheduleResume(at, true);
+  }
 
   // ---------- Fichiers modifiés par Claude ----------
 
@@ -840,6 +916,8 @@ export class ChatSession implements RemoteSink {
     this.suggestion = null; this.clearChangedFiles(); this.cancelResume();
     this.session = s; this.customTitle = undefined; this.allowAll = false;
     this.queue = []; this.files = []; this.images = []; this.forkNext = false;
+    this.quotaGuardOn = false;
+    this.sessionLocked = false;
     this.usageIn = 0; this.usageOut = 0; this.costUsd = 0; this.liveCtx = 0; this.liveOut = 0; this.activeModel = undefined;
     this.applyRemote(this.env.config('remote.default', false));
     this.env.setTitle(s.title);
@@ -1186,6 +1264,10 @@ export class ChatSession implements RemoteSink {
   /** Message libre reçu du téléphone : devient un message de l'utilisateur (ou attend la fin de la réponse). */
   onPhoneMessage(text: string): void {
     if (!this.remoteOn) return;
+    if (this.sessionLocked) {
+      this.env.remote.notifyPhone('🔒 Cette session est verrouillée ; le message n’a pas été envoyé.');
+      return;
+    }
     if (this.streaming) {
       this.queue.push(text); this.sendQueue();
       this.env.remote.say(this, '📨 Claude est encore au travail : ton message est en file d\'attente.');

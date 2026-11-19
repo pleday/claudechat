@@ -16,7 +16,7 @@ en deux versions aux fonctionnalités identiques :
 - **Conversation en streaming** : Markdown, réflexion, cartes d'outils, historique de saisie, pièces jointes (images, fichiers, vidéos), mentions `@fichier` et commandes `/` de la CLI.
 - **Contrôle total** : approbation des actions, plan et questions de Claude, **diff modifiable** avant d'accepter, changement du mode de permission en cours de réponse, messages empilés ou précisions injectées sans interrompre.
 - **Fichiers modifiés par Claude** : la liste de ce que Claude a créé, modifié ou supprimé (y compris via Bash, sous-agents ou outils MCP), avec comparaison « avant Claude ↔ actuel ». Indépendant de git.
-- **Suivi** : quotas de la session de 5 h, détail du contexte, durée, coût, titre de session, reprise automatique après un quota atteint.
+- **Suivi** : quotas de la session de 5 h, détail du contexte, durée, coût, titre de session, reprise automatique après un quota atteint ; protection activable pour verrouiller la session quand le quota 5 h ou hebdomadaire est épuisé. Si la reprise automatique est active, la conversation reprend au prochain reset sans désactiver la protection.
 - **Sessions** : reprise des sessions de la CLI (`~/.claude/projects`) ; une conversation commencée dans un éditeur se poursuit dans l'autre.
 - **MCP** : gestion des serveurs MCP.
 - **Accès à distance** : débloquez une demande d'autorisation depuis votre smartphone grâce à un bot Telegram.

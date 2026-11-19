@@ -115,6 +115,27 @@ describe('interface du webview', () => {
     expect(($('send') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('désactive les envois lorsque la session est verrouillée', () => {
+    sent.length = 0;
+    const input = $('input') as HTMLTextAreaElement;
+    input.value = 'test';
+    input.dispatchEvent(new Event('input'));
+    host({ t: 'state', patch: { quotaGuardOn: true, sessionLocked: false } });
+    expect(($('send') as HTMLButtonElement).disabled).toBe(false);
+    expect($('sessionLockBtn').querySelector('svg path')?.getAttribute('d')).toContain('13 3.4');
+    $('sessionLockBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(sent).toEqual([{ t: 'toggleQuotaGuard' }]);
+    sent.length = 0;
+    host({ t: 'state', patch: { sessionLocked: true } });
+    expect(($('send') as HTMLButtonElement).disabled).toBe(true);
+    $('sessionLockBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(sent).toEqual([{ t: 'toggleQuotaGuard' }]);
+    host({ t: 'state', patch: { sessionLocked: false } });
+    host({ t: 'state', patch: { quotaGuardOn: false } });
+    expect($('sessionLockBtn').querySelector('svg path')?.getAttribute('d')).toContain('13 3.4');
+    expect($('sessionLockBtn').querySelector('svg rect')).toBeNull();
+  });
+
   it('historique : ↑ rappelle le message envoyé', () => {
     const input = $('input') as HTMLTextAreaElement;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));

@@ -15,6 +15,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tbsep { width: 1px; height: 16px; margin: 0 4px; background: var(--vscode-panel-border, #8886); }
 .tb { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; background: none; border: none; border-radius: 5px; color: var(--vscode-icon-foreground, var(--vscode-foreground)); opacity: .7; }
 .tb svg { width: 17px; height: 17px; }
+#sessionLockBtn svg { display: block; width: 20px; height: 20px; }
 .tb:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
 .tb.on { opacity: 1; color: var(--accent, var(--vscode-focusBorder)); background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground)); }
 .tb:disabled { opacity: .3; cursor: default; background: none; }
