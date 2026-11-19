@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.10/claude-chat-0.9.10.zip" version="0.9.10">
+  <plugin id="dev.claudechat" url="https://github.com/pleday/claudechat/releases/download/v0.9.11/claude-chat-0.9.11.zip" version="0.9.11">
     <idea-version since-build="243"/>
     <name>Claude Chat</name>
     <description>Interface graphique pour Claude Code (CLI claude) dans les IDE JetBrains.</description>
     <change-notes><![CDATA[<ul>
-<li><b>Message épinglé</b> : replié, il montre ses 3 premières lignes avec leurs retours à la ligne au lieu d'une seule ligne aplatie</li>
-<li><b>File d'attente</b> : l'aperçu du dernier message en attente garde aussi ses retours à la ligne (3 lignes)</li>
-<li><b>Message de l'utilisateur</b> : dans la conversation, il s'affiche tel que saisi (retours à la ligne et indentation conservés) au lieu d'être passé au rendu Markdown</li>
+<li><b>Protection de quota</b> : active un verrouillage automatique quand le quota 5 h ou hebdomadaire est épuisé ; la réponse en cours s'arrête et les nouveaux envois sont bloqués. Avec la reprise automatique, la conversation repart au reset du quota sans désactiver la protection.</li>
+<li><b>Icône de protection</b> : bouclier natif assorti aux icônes de l'IDE.</li>
 </ul>]]></change-notes>
   </plugin>
 </plugins>
